@@ -1,0 +1,243 @@
+@import "@fontsource-variable/fraunces/opsz.css";
+@import "@fontsource-variable/fraunces/opsz-italic.css";
+@import "@fontsource/plus-jakarta-sans/400.css";
+@import "@fontsource/plus-jakarta-sans/500.css";
+@import "@fontsource/plus-jakarta-sans/600.css";
+@import "@fontsource-variable/geist-mono/index.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Warm Atelier: dark (default) ─────────────────────── */
+:root {
+  --bg: #120f0b;
+  --surface: #1c1710;
+  --surface-2: #252017;
+  --border: #3a3228;
+  --text: #f0ebe2;
+  --text-muted: #9a8f82;
+  --accent: #e07d52;
+  --accent-soft: rgba(224, 125, 82, 0.14);
+  --accent-glow: rgba(224, 125, 82, 0.28);
+  --orb-inner: rgba(224, 125, 82, 0.22);
+  --orb-ring: rgba(224, 125, 82, 0.08);
+  --warm-shadow: 0 4px 32px rgba(0, 0, 0, 0.5), 0 1px 4px rgba(0, 0, 0, 0.3);
+  --card-shadow: 0 2px 16px rgba(0, 0, 0, 0.35), 0 0 0 1px var(--border);
+}
+
+/* ── Warm Atelier: light ──────────────────────────────── */
+.light {
+  --bg: #faf7f2;
+  --surface: #ffffff;
+  --surface-2: #f0ebe0;
+  --border: #e2d9ce;
+  --text: #1a1208;
+  --text-muted: #7a6f65;
+  --accent: #c96940;
+  --accent-soft: rgba(201, 105, 64, 0.11);
+  --accent-glow: rgba(201, 105, 64, 0.22);
+  --orb-inner: rgba(201, 105, 64, 0.18);
+  --orb-ring: rgba(201, 105, 64, 0.07);
+  --warm-shadow: 0 2px 16px rgba(120, 80, 40, 0.12), 0 1px 3px rgba(120, 80, 40, 0.08);
+  --card-shadow: 0 2px 12px rgba(120, 80, 40, 0.1), 0 0 0 1px var(--border);
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  @apply bg-bg text-text antialiased;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+
+/* Grain overlay ───────────────────────────────────────── */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.032;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+}
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  }
+  h1, h2, h3, h4, h5, h6, .font-display {
+    font-family: 'Fraunces', Georgia, serif;
+  }
+  code, pre, .font-mono {
+    font-family: 'Geist Mono', 'Fira Code', monospace;
+  }
+}
+
+/* ── Keyframes ────────────────────────────────────────── */
+
+@keyframes orb-breathe {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 40px var(--accent-glow), 0 0 80px rgba(0,0,0,0.3);
+  }
+  50% {
+    transform: scale(1.025);
+    box-shadow: 0 0 60px var(--accent-glow), 0 0 100px rgba(0,0,0,0.2);
+  }
+}
+
+@keyframes ring-expand-1 {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.08); opacity: 0.2; }
+}
+
+@keyframes ring-expand-2 {
+  0%, 100% { transform: scale(1); opacity: 0.3; }
+  50% { transform: scale(1.12); opacity: 0.1; }
+}
+
+@keyframes ring-expand-3 {
+  0%, 100% { transform: scale(1); opacity: 0.15; }
+  50% { transform: scale(1.18); opacity: 0.05; }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes blink-soft {
+  0%, 45% { opacity: 1; }
+  50%, 100% { opacity: 0.15; }
+}
+
+/* ── Animation utilities ──────────────────────────────── */
+
+.animate-orb-breathe {
+  animation: orb-breathe 4s ease-in-out infinite;
+}
+
+.animate-ring-1 {
+  animation: ring-expand-1 4s ease-in-out infinite;
+}
+
+.animate-ring-2 {
+  animation: ring-expand-2 4s ease-in-out infinite 0.6s;
+}
+
+.animate-ring-3 {
+  animation: ring-expand-3 4s ease-in-out infinite 1.2s;
+}
+
+.animate-fade-up {
+  animation: fade-up 0.5s ease-out both;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out both;
+}
+
+.streaming-cursor {
+  animation: blink-soft 1s step-end infinite;
+}
+
+/* ── Staggered reveals ────────────────────────────────── */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.12s; }
+.stagger-3 { animation-delay: 0.20s; }
+.stagger-4 { animation-delay: 0.30s; }
+.stagger-5 { animation-delay: 0.42s; }
+.stagger-6 { animation-delay: 0.56s; }
+
+/* ── Scrollbar ────────────────────────────────────────── */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Glass surface ────────────────────────────────────── */
+.glass {
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.glass-heavy {
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+/* ── Warm shadows ─────────────────────────────────────── */
+.warm-shadow {
+  box-shadow: var(--warm-shadow);
+}
+
+.card-shadow {
+  box-shadow: var(--card-shadow);
+}
+
+/* ── Shimmer loader ───────────────────────────────────── */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--surface-2) 0%,
+    var(--border) 50%,
+    var(--surface-2) 100%
+  );
+  background-size: 200% auto;
+  animation: shimmer 1.6s linear infinite;
+}
+
+/* ── Prose for chat ───────────────────────────────────── */
+.prose-chat p { @apply mb-3 last:mb-0; }
+.prose-chat ul { @apply mb-3 list-disc pl-5 last:mb-0; }
+.prose-chat ol { @apply mb-3 list-decimal pl-5 last:mb-0; }
+.prose-chat li { @apply mb-1; }
+.prose-chat strong { @apply font-semibold; }
+.prose-chat blockquote { 
+  @apply border-l-4 pl-4 italic text-muted my-4 py-1;
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+/* ── Fraunces display ─────────────────────────────────── */
+.font-display {
+  font-family: 'Fraunces', Georgia, serif;
+  font-optical-sizing: auto;
+}
+
+/* ── Widget card ──────────────────────────────────────── */
+.widget-card {
+  @apply rounded-2xl bg-surface border border-border p-5;
+  box-shadow: var(--card-shadow);
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.widget-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+  box-shadow: var(--card-shadow), 0 0 0 1px var(--accent-soft);
+}
