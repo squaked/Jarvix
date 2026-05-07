@@ -2,13 +2,41 @@
 
 Local-first chat UI with streaming models (OpenRouter, Google Gemini, Groq), macOS tools (Spotlight, Calendar, screenshots), and free web search via DuckDuckGo instant answers.
 
-## Quick install (planned distribution)
+## Install (one command)
+
+Open **Terminal** (press `⌘ Space`, type "Terminal", press Enter) and paste:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/jarvix/main/install.sh | bash
 ```
 
-Use `JARVIX_REPO_URL` (or legacy `JARVIS_REPO_URL`) if you fork the repo. Development clone:
+That's it. The installer will:
+1. Install any missing tools automatically
+2. Download and build Jarvix in the background
+3. Start Jarvix and open it in your browser
+4. Add a **Jarvix** app to `~/Applications` — drag it to your Dock
+5. Keep Jarvix **running in the background** and **auto-update nightly** — no action needed
+
+After install, just click the Jarvix icon in your Dock (or open [http://localhost:3000](http://localhost:3000)) and complete the quick onboarding to add your AI key.
+
+**To uninstall:** paste this in Terminal:
+```bash
+curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/jarvix/main/scripts/uninstall.sh | bash
+```
+
+### Private repo / alternate location
+
+```bash
+# If the repo is private, pass a read-only GitHub token:
+JARVIX_GITHUB_TOKEN=ghp_yourtoken \
+  curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/jarvix/main/install.sh | bash
+
+# To install to a different folder:
+JARVIX_INSTALL_DIR=~/my-jarvix \
+  curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/jarvix/main/install.sh | bash
+```
+
+## Development
 
 ```bash
 git clone <your-repo-url> jarvix && cd jarvix && npm install && npm run dev
