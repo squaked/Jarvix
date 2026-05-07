@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { clearMemory, deleteMemory, getMemory, mergeImportedMemoryEntries } from "@/lib/memory";
-import type { MemoryEntry } from "@/lib/types";
+import { clearMemory, deleteMemory, getMemory } from "@/lib/memory";
 
 export async function GET() {
   const memories = await getMemory();
@@ -8,17 +7,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  let body: {
-    deleteId?: string;
-    clearAll?: boolean;
-    mergeImport?: MemoryEntry[];
-  };
+  let body: { deleteId?: string; clearAll?: boolean };
   try {
-    body = (await request.json()) as {
-      deleteId?: string;
-      clearAll?: boolean;
-      mergeImport?: MemoryEntry[];
-    };
+    body = (await request.json()) as { deleteId?: string; clearAll?: boolean };
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
@@ -33,16 +24,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  if (Array.isArray(body.mergeImport) && body.mergeImport.length > 0) {
-    const memories = await mergeImportedMemoryEntries(body.mergeImport);
-    return NextResponse.json({ ok: true, memories });
-  }
-
   return NextResponse.json(
-    {
-      error:
-        "Provide deleteId, clearAll: true, or mergeImport: [ { id, fact, createdAt }, ... ]",
-    },
+    { error: "Provide deleteId or clearAll: true" },
     { status: 400 },
   );
 }

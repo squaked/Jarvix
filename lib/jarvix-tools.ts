@@ -13,10 +13,9 @@ import {
 } from "./tool-runners/files";
 import { captureScreenshotForAssistantTool } from "./tool-runners/screenshot";
 import { getWeather } from "./tool-runners/weather";
-import { addMemory } from "./memory";
+import { addMemory, getMemory } from "./memory";
 import { parseCalendarRangeBounds } from "./calendar-parse";
 import { normalizeFact } from "./memory-policy";
-import type { MemoryEntry } from "./types";
 
 /**
  * Gemini (via @ai-sdk/google) maps empty object schemas to `parameters: undefined`, which
@@ -44,13 +43,8 @@ const calendarRangeInputSchema = z.object({
     ),
 });
 
-export function createJarvixToolset(ctx: {
-  memoryEnabled?: boolean;
-  /** Dedup baseline for remember_user_note (usually merged server + browser snapshot). */
-  memoryDuplicatesBaseline?: MemoryEntry[];
-}) {
+export function createJarvixToolset(ctx: { memoryEnabled?: boolean }) {
   const memoryEnabled = Boolean(ctx.memoryEnabled);
-  const liveDupCheck = [...(ctx.memoryDuplicatesBaseline ?? [])];
   return {
     web_search: tool({
       description:
@@ -234,7 +228,8 @@ export function createJarvixToolset(ctx: {
                   return { saved: false as const, reason: "too_short" };
                 }
                 const key = normalized.toLowerCase();
-                const dup = liveDupCheck.some(
+                const existing = await getMemory();
+                const dup = existing.some(
                   (m) => normalizeFact(m.fact).toLowerCase() === key,
                 );
                 if (dup) {
@@ -244,13 +239,7 @@ export function createJarvixToolset(ctx: {
                 if (!entry) {
                   return { saved: false as const, reason: "rejected" };
                 }
-                liveDupCheck.push(entry);
-                return {
-                  saved: true as const,
-                  id: entry.id,
-                  fact: entry.fact,
-                  createdAt: entry.createdAt,
-                };
+                return { saved: true as const, id: entry.id };
               } catch (e) {
                 return {
                   saved: false as const,

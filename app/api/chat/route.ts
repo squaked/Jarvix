@@ -7,7 +7,7 @@ import {
   createJarvixToolset,
   type JarvixToolSet,
 } from "@/lib/jarvix-tools";
-import { formatMemoryForSystemPrompt, mergeMemorySources } from "@/lib/memory-policy";
+import { formatMemoryForSystemPrompt } from "@/lib/memory-policy";
 import { getMemory } from "@/lib/memory";
 import { formatUnknownError } from "@/lib/format-unknown-error";
 import { jsonStringifyLine } from "@/lib/json-safe";
@@ -15,7 +15,7 @@ import { groqUsageFromHeaders, isGroqUsagePayloadEmpty } from "@/lib/groq-usage-
 import { jarvixChatStreamProviderOptions } from "@/lib/chat-stream-provider-options";
 import { mergeSettingsPartial } from "@/lib/settings-merge";
 import { hasActiveApiKey } from "@/lib/settings-credentials";
-import type { MemoryEntry, Message, Settings } from "@/lib/types";
+import type { Message, Settings } from "@/lib/types";
 import { stepCountIs, streamText } from "ai";
 
 function ndjsonLine(obj: unknown) {
@@ -27,17 +27,9 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 export async function POST(req: NextRequest) {
-  let body: {
-    messages?: Message[];
-    settings?: Settings;
-    memories?: MemoryEntry[];
-  };
+  let body: { messages?: Message[]; settings?: Settings };
   try {
-    body = (await req.json()) as {
-      messages?: Message[];
-      settings?: Settings;
-      memories?: MemoryEntry[];
-    };
+    body = (await req.json()) as { messages?: Message[]; settings?: Settings };
   } catch {
     return new Response(ndjsonLine({ type: "error", message: "Invalid JSON" }), {
       status: 400,
@@ -57,17 +49,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const serverMem = settings.memoryEnabled ? await getMemory() : [];
-  const mergedForPrompt =
-    body.memories === undefined
-      ? serverMem
-      : mergeMemorySources(serverMem, Array.isArray(body.memories) ? body.memories : []);
-
   let tools: JarvixToolSet;
   try {
     tools = createJarvixToolset({
       memoryEnabled: settings.memoryEnabled,
-      memoryDuplicatesBaseline: settings.memoryEnabled ? mergedForPrompt : undefined,
     });
   } catch (e) {
     return new Response(
@@ -93,7 +78,7 @@ export async function POST(req: NextRequest) {
   }
 
   const memoryFacts = settings.memoryEnabled
-    ? formatMemoryForSystemPrompt(mergedForPrompt)
+    ? formatMemoryForSystemPrompt(await getMemory())
     : "";
 
   const webToolsHint = `

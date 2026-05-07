@@ -11,10 +11,6 @@ import { mergeProfileRecords } from "@/lib/settings-merge";
 import { useJarvixSettings } from "@/lib/settings";
 import type { AgentPersonalization } from "@/lib/types";
 import { verifyProviderKey } from "@/lib/verify-provider-key";
-import {
-  runCalendarPrivacyButtonAction,
-  userAgentLooksLikeMacDesktop,
-} from "@/lib/calendar-privacy-client";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -50,8 +46,9 @@ export default function OnboardingFlow() {
   const [weatherLocationDraft, setWeatherLocationDraft] = useState(
     DEFAULT_JARVIX_SETTINGS.weatherLocation,
   );
-  const [calendarPrivacyNote, setCalendarPrivacyNote] = useState<string | null>(null);
+  const [calendarPrivacyOpened, setCalendarPrivacyOpened] = useState(false);
   const [calendarPrivacyBusy, setCalendarPrivacyBusy] = useState(false);
+  const [showPrivacyFallbackTip, setShowPrivacyFallbackTip] = useState(false);
 
   useEffect(() => {
     if (!bootstrapped) return;
@@ -89,47 +86,16 @@ export default function OnboardingFlow() {
 
   const openCalendarPrivacy = async () => {
     setCalendarPrivacyBusy(true);
-    setCalendarPrivacyNote(null);
     try {
-      const { deepLinkAttempted, api } = await runCalendarPrivacyButtonAction();
-      const bits: string[] = [];
-
-      if (deepLinkAttempted) {
-        bits.push(
-          "System Settings should open (Privacy & Security → Calendars). If not, open it manually.",
-        );
-      } else if (userAgentLooksLikeMacDesktop()) {
-        bits.push(
-          "Open System Settings → Privacy & Security → Calendars manually.",
-        );
+      const res = await fetch("/api/open-calendars-privacy", { method: "POST" });
+      const data = (await res.json()) as { calendarAccess?: { jarvixHelperReady?: boolean } };
+      if (data.calendarAccess?.jarvixHelperReady === false) {
+        setShowPrivacyFallbackTip(true);
       }
-
-      if (api.ok) {
-        bits.push("Jarvix also ran the server-side shortcut (localhost Mac).");
-      } else if (api.error) {
-        bits.push(
-          userAgentLooksLikeMacDesktop() && deepLinkAttempted
-            ? `Server note: ${api.error}`
-            : api.error,
-        );
-      }
-
-      if (api.calendarAccess?.jarvixHelperReady === false) {
-        bits.push(
-          "If you don’t see “Jarvix”, enable Calendars for Terminal, Cursor, or whatever runs Jarvix on this Mac.",
-        );
-      }
-      if (api.calendarAccess?.status === "timeout") {
-        bits.push(
-          "Permission check timed out — you can still enable access in Settings.",
-        );
-      }
-
-      setCalendarPrivacyNote(bits.length > 0 ? bits.join("\n\n") : "Done — check Privacy → Calendars.");
-    } catch (e) {
-      setCalendarPrivacyNote(
-        e instanceof Error ? e.message : "Could not reach Jarvix. Try again or open Settings manually.",
-      );
+      setCalendarPrivacyOpened(true);
+    } catch {
+      setShowPrivacyFallbackTip(true);
+      setCalendarPrivacyOpened(true);
     } finally {
       setCalendarPrivacyBusy(false);
     }
@@ -338,9 +304,8 @@ export default function OnboardingFlow() {
                   Calendar
                 </h2>
                 <p className="mt-1 text-sm text-muted leading-relaxed">
-                  On a Mac, this opens Privacy &amp; Security → Calendars (from your browser and, when possible, from the
-                  Jarvix server). If you use a hosted URL, Safari/Chrome still open Settings on{' '}
-                  <em>your</em> Mac; the remote server alone cannot grant permission.
+                  Tap below to open Calendar privacy in System Settings to authorize the app Jarvix is running on this Mac.
+                  You can finish later in Settings too.
                 </p>
               </div>
               <div className="flex flex-col gap-2">
@@ -353,8 +318,17 @@ export default function OnboardingFlow() {
                 >
                   {calendarPrivacyBusy ? "Preparing…" : "Open Calendar privacy"}
                 </Button>
-                {calendarPrivacyNote ? (
-                  <p className="text-xs whitespace-pre-line text-muted leading-relaxed">{calendarPrivacyNote}</p>
+                {calendarPrivacyOpened ? (
+                  <p className="text-xs" style={{ color: "var(--accent)" }}>
+                    Calendar settings should have opened. Turn Calendars on for Jarvix if you see it, then reload this
+                    page.
+                  </p>
+                ) : null}
+                {showPrivacyFallbackTip ? (
+                  <p className="text-xs text-muted leading-relaxed">
+                    Don’t worry if you don’t see “Jarvix” yet—that’s common with a browser setup. Use Cursor, Terminal,
+                    or Node in the same list if that’s what runs Jarvix on your Mac, or wait a minute and tap again.
+                  </p>
                 ) : null}
               </div>
               <div className="flex flex-col gap-2">

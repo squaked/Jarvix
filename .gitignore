@@ -30,9 +30,8 @@ yarn-error.log*
 .jarvix-data/
 .jarvix-data/
 
-# vercel / netlify
+# vercel
 .vercel
-.netlify
 
 # typescript
 *.tsbuildinfo

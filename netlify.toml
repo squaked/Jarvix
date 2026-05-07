@@ -1,8 +1,0 @@
-# Next.js on Netlify — see https://docs.netlify.com/frameworks/next-js/overview/
-# Use Site settings → Environment variables for secrets (e.g. GROQ_API_KEY).
-
-[build]
-  command = "npm run build"
-
-[[plugins]]
-  package = "@netlify/plugin-nextjs"

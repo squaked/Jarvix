@@ -302,15 +302,13 @@ export async function calendarCreateEvent(input: {
 /**
  * Ask macOS for calendar access before opening Privacy settings.
  */
-export type CalendarAccessAttemptResult = {
+export async function requestCalendarAccessAttempt(): Promise<{
   eventkitAvailable: boolean;
   accessGranted: boolean;
   status: string;
   /** True when the Jarvix helper app exists — that’s what shows up as “Jarvix” in Privacy. */
   jarvixHelperReady: boolean;
-};
-
-export async function requestCalendarAccessAttempt(): Promise<CalendarAccessAttemptResult> {
+}> {
   if (await eventKitHelperUsable()) {
     try {
       const { granted, status } = await helperRequestAccess();

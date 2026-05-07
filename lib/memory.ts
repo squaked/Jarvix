@@ -6,7 +6,6 @@ import type { MemoryEntry } from "./types";
 import {
   MEMORY_LIMITS,
   capMemoryEntries,
-  mergeMemorySources,
   normalizeFact,
 } from "./memory-policy";
 import { getJarvixProjectDataDir } from "./project-data-dir";
@@ -92,17 +91,4 @@ export async function deleteMemory(id: string): Promise<void> {
 export async function clearMemory(): Promise<void> {
   await ensureDir();
   await fs.writeFile(memoryFile(), serializeMemory([]), "utf-8");
-}
-
-/** Dedup-merge inbound entries into disk-backed memory (restore / sync). */
-export async function mergeImportedMemoryEntries(
-  inbound: MemoryEntry[],
-): Promise<MemoryEntry[]> {
-  await ensureDir();
-  if (!Array.isArray(inbound) || inbound.length === 0) {
-    return await getMemory();
-  }
-  const merged = mergeMemorySources(await getMemory(), inbound);
-  await fs.writeFile(memoryFile(), serializeMemory(merged), "utf-8");
-  return merged;
 }
