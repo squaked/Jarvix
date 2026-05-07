@@ -173,3 +173,12 @@ export async function appendMessagesToChat(
 
   return local;
 }
+
+/** Best-effort: push chats with messages to `/api/chats` (bulk restore after import). */
+export async function flushChatsToServerQuiet(chats: Chat[]): Promise<void> {
+  await migrateLegacyChatsOnce();
+  for (const c of chats) {
+    if (!Array.isArray(c.messages) || c.messages.length === 0) continue;
+    await syncChatPostQuiet({ action: "save", chat: c });
+  }
+}

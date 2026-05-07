@@ -5,6 +5,7 @@ import { CalendarAccessCard } from "@/components/settings/CalendarAccessCard";
 import { WeatherLocationCard } from "@/components/settings/WeatherLocationCard";
 import { GroqUsageSection } from "@/components/settings/GroqUsageSection";
 import { MemoryViewer } from "@/components/settings/MemoryViewer";
+import { BackupExportCard } from "@/components/settings/BackupExportCard";
 import { ProviderForm } from "@/components/settings/ProviderForm";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
@@ -52,6 +53,7 @@ export default function SettingsPage() {
         <WeatherLocationCard onSaved={notifySaved} />
         <CalendarAccessCard />
         <MemoryViewer onSaved={notifySaved} />
+        <BackupExportCard onRestored={notifySaved} />
       </div>
 
       {/* Saved toast */}

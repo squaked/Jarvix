@@ -76,6 +76,42 @@ export function mergeSettingsPartial(
   };
 }
 
+/** Overlay a backup/settings patch onto the current snapshot (import restore). */
+export function mergeSettingsOnto(
+  prev: Settings,
+  patch: Partial<Settings>,
+): Settings {
+  const memoryEnabled =
+    typeof patch.memoryEnabled === "boolean"
+      ? patch.memoryEnabled
+      : prev.memoryEnabled;
+  const profiles = patch.profiles
+    ? mergeProfileRecords(
+        prev.profiles,
+        patch.profiles as Partial<Record<string, Partial<ProviderProfile>>>,
+      )
+    : prev.profiles;
+  const agent =
+    patch.agent !== undefined
+      ? normalizeAgentPersonalization({
+          ...prev.agent,
+          ...patch.agent,
+        })
+      : prev.agent;
+  const weatherLocation =
+    typeof patch.weatherLocation === "string" && patch.weatherLocation.trim()
+      ? patch.weatherLocation.trim()
+      : prev.weatherLocation;
+
+  return {
+    provider: "groq",
+    memoryEnabled,
+    profiles,
+    agent,
+    weatherLocation,
+  };
+}
+
 function normalizeProfiles(p: LegacyFlat): Settings["profiles"] {
   const base = createDefaultProfiles();
   const raw = p.profiles;

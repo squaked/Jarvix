@@ -47,3 +47,24 @@ export async function clearAllMemoryRemote(): Promise<void> {
     /* best-effort */
   }
 }
+
+export async function pushMemoryMergeToServer(entries: MemoryEntry[]): Promise<void> {
+  const list = entries.filter(
+    (m): m is MemoryEntry =>
+      typeof m === "object" &&
+      m !== null &&
+      typeof m.id === "string" &&
+      typeof (m as MemoryEntry).fact === "string" &&
+      typeof (m as MemoryEntry).createdAt === "string",
+  );
+  if (list.length === 0) return;
+  try {
+    await fetch("/api/memory", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mergeImport: list }),
+    });
+  } catch {
+    /* best-effort */
+  }
+}
