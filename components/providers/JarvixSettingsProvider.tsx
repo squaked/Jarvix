@@ -10,7 +10,7 @@ import {
   SETTINGS_LOCALSTORAGE_LEGACY_KEYS,
 } from "@/lib/settings-defaults";
 import { hasActiveApiKey } from "@/lib/settings-credentials";
-import { mergeSettingsPartial } from "@/lib/settings-merge";
+import { mergeSettingsOnto, mergeSettingsPartial } from "@/lib/settings-merge";
 import type { Settings } from "@/lib/types";
 import {
   createContext,
@@ -98,6 +98,9 @@ export function JarvixSettingsProvider({ children }: { children: ReactNode }) {
             });
             if (post.ok) {
               server = (await post.json()) as Settings;
+            } else {
+              /** Server is empty/unreachable but local mirror has keys — never wipe BYOK. */
+              server = fallback;
             }
           }
         }
@@ -125,6 +128,11 @@ export function JarvixSettingsProvider({ children }: { children: ReactNode }) {
   }, [bootstrapped]);
 
   const saveSettings = useCallback(async (partial: Partial<Settings>) => {
+    const optimistic = mergeSettingsOnto(hydratedRef.current, partial);
+    writeSettingsMirror(optimistic);
+    hydratedRef.current = optimistic;
+    setSettings(optimistic);
+
     const res = await fetch("/api/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

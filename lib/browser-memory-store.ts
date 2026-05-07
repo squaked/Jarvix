@@ -22,44 +22,54 @@ export function normalizeMemoryEntries(list: unknown): MemoryEntry[] {
   );
 }
 
+function readMemoryLocalStorage(): MemoryEntry[] {
+  try {
+    const ls = localStorage.getItem(LS_MEMORY_FALLBACK_KEY);
+    if (!ls) return [];
+    return capMemoryEntries(normalizeMemoryEntries(JSON.parse(ls) as unknown));
+  } catch {
+    return [];
+  }
+}
+
+function writeMemoryLocalStorage(entries: MemoryEntry[]): void {
+  try {
+    const capped = capMemoryEntries(entries);
+    localStorage.setItem(LS_MEMORY_FALLBACK_KEY, JSON.stringify(capped));
+  } catch {
+    /* quota */
+  }
+}
+
 export async function readBrowserMemory(): Promise<MemoryEntry[]> {
+  let fromIdb: MemoryEntry[] = [];
   try {
     if (await jarvixIdbUsable()) {
       const raw = await readJarvixKey(IDB_MEMORY_KEY);
-      return capMemoryEntries(normalizeMemoryEntries(raw));
-    }
-  } catch {
-    /* fall through */
-  }
-  try {
-    const ls = localStorage.getItem(LS_MEMORY_FALLBACK_KEY);
-    if (ls) {
-      return capMemoryEntries(normalizeMemoryEntries(JSON.parse(ls) as unknown));
+      fromIdb = capMemoryEntries(normalizeMemoryEntries(raw));
     }
   } catch {
     /* noop */
   }
-  return [];
+  const fromLs = readMemoryLocalStorage();
+  return capMemoryEntries(mergeMemorySources(fromIdb, fromLs));
 }
 
 export async function writeBrowserMemory(entries: MemoryEntry[]): Promise<void> {
   const capped = capMemoryEntries(entries);
+  writeMemoryLocalStorage(capped);
   try {
     if (await jarvixIdbUsable()) {
       await writeJarvixKey(IDB_MEMORY_KEY, capped);
-      return;
     }
   } catch {
-    /* fall through */
+    /* localStorage still holds data */
   }
-  localStorage.setItem(LS_MEMORY_FALLBACK_KEY, JSON.stringify(capped));
 }
 
 export async function mergeRemoteMemory(remote: MemoryEntry[]): Promise<void> {
   const local = await readBrowserMemory();
-  await writeBrowserMemory(
-    mergeMemorySources(local, normalizeMemoryEntries(remote)),
-  );
+  await writeBrowserMemory(mergeMemorySources(local, normalizeMemoryEntries(remote)));
 }
 
 /** Append one entry (dedupe by normalized fact), same policy as disk. */

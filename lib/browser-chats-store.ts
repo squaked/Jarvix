@@ -58,11 +58,15 @@ function parseStoredChats(raw: unknown): Chat[] {
   ) as Chat[];
 }
 
-async function writeLocalFallback(chats: Chat[]): Promise<void> {
-  localStorage.setItem(LS_CHATS_FALLBACK_KEY, JSON.stringify(chats));
+function writeLocalFallback(chats: Chat[]): void {
+  try {
+    localStorage.setItem(LS_CHATS_FALLBACK_KEY, JSON.stringify(chats));
+  } catch {
+    /* quota / private mode */
+  }
 }
 
-async function readLocalFallback(): Promise<Chat[] | undefined> {
+function readLocalFallback(): Chat[] | undefined {
   const raw = localStorage.getItem(LS_CHATS_FALLBACK_KEY);
   if (!raw) return undefined;
   try {
@@ -73,28 +77,36 @@ async function readLocalFallback(): Promise<Chat[] | undefined> {
 }
 
 export async function readBrowserChats(): Promise<Chat[]> {
+  /** Merge IDB + localStorage so data survives mixed write failures (IDB ok but write threw → LS-only, etc.). */
+  let fromIdb: Chat[] = [];
   try {
     if (await jarvixIdbUsable()) {
       const raw = await readJarvixKey(IDB_CHATS_KEY);
-      return parseStoredChats(raw).map(normalizeChatInput);
+      fromIdb = parseStoredChats(raw).map(normalizeChatInput);
     }
   } catch {
-    /* fall through */
+    /* noop */
   }
-  return (await readLocalFallback())?.map(normalizeChatInput) ?? [];
+  let fromLs: Chat[] = [];
+  try {
+    const ls = readLocalFallback();
+    if (ls) fromLs = ls.map(normalizeChatInput);
+  } catch {
+    /* noop */
+  }
+  return mergeChatLists(fromIdb, fromLs);
 }
 
 export async function writeBrowserChats(chats: Chat[]): Promise<void> {
   const normalized = chats.map(normalizeChatInput);
+  writeLocalFallback(normalized);
   try {
     if (await jarvixIdbUsable()) {
       await writeJarvixKey(IDB_CHATS_KEY, normalized);
-      return;
     }
   } catch {
-    /* fall through */
+    /* localStorage already has the canonical copy */
   }
-  await writeLocalFallback(normalized);
 }
 
 function nowISO() {
