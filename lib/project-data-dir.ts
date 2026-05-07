@@ -13,7 +13,7 @@ function defaultServerlessDataDir(): string {
   return path.join(os.tmpdir(), "jarvix-data");
 }
 
-function useServerlessFriendlyDataDir(): boolean {
+function prefersEphemeralJarvixDataDir(): boolean {
   const flag = process.env.JARVIX_USE_TMP_DATA_DIR?.trim().toLowerCase();
   if (flag === "1" || flag === "true" || flag === "yes") return true;
   if (flag === "0" || flag === "false" || flag === "no") return false;
@@ -27,7 +27,7 @@ export function getJarvixProjectDataDir(): string {
   const override =
     process.env.JARVIX_DATA_DIR?.trim() || process.env.JARVIS_DATA_DIR?.trim();
   if (override) return path.resolve(override);
-  if (useServerlessFriendlyDataDir()) return defaultServerlessDataDir();
+  if (prefersEphemeralJarvixDataDir()) return defaultServerlessDataDir();
 
   const cwd = process.cwd();
   const nextPath = path.join(cwd, NEW_DATA_DIR);

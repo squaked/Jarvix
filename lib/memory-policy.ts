@@ -42,6 +42,22 @@ export function capMemoryEntries(entries: MemoryEntry[]): MemoryEntry[] {
     );
 }
 
+/** Union memory lists deduping by normalized fact text (first occurrence wins ordering). */
+export function mergeMemorySources(...lists: MemoryEntry[][]): MemoryEntry[] {
+  const seen = new Set<string>();
+  const out: MemoryEntry[] = [];
+  for (const list of lists) {
+    if (!Array.isArray(list)) continue;
+    for (const m of list) {
+      const k = normalizeFact(m.fact).toLowerCase();
+      if (!k || seen.has(k)) continue;
+      seen.add(k);
+      out.push(m);
+    }
+  }
+  return capMemoryEntries(out);
+}
+
 /**
  * Most recent first, trim for system prompt token budget.
  */

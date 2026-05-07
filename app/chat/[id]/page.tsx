@@ -8,6 +8,10 @@ import {
   appHeaderIconButtonClassCompact,
 } from "@/components/layout/AppHeader";
 import { Sidebar } from "@/components/sidebar/Sidebar";
+import {
+  appendBrowserMemory,
+  readBrowserMemory,
+} from "@/lib/browser-memory-store";
 import { writeGroqQuotaToSession } from "@/lib/groq-quota-global";
 import { useJarvixSettings } from "@/lib/settings";
 import { appendMessagesToChat, getChat, getChats } from "@/lib/storage";
@@ -28,6 +32,24 @@ type StreamChunk =
   | { type: "groq_quota"; usage: GroqTranscriptionUsage }
   | { type: "done" }
   | { type: "error"; message?: string };
+
+async function persistRememberUserNoteFromToolResult(result: unknown): Promise<void> {
+  if (
+    typeof result !== "object" ||
+    result === null ||
+    (result as { saved?: unknown }).saved !== true ||
+    typeof (result as { id?: unknown }).id !== "string" ||
+    typeof (result as { fact?: unknown }).fact !== "string"
+  ) {
+    return;
+  }
+  const r = result as { id: string; fact: string; createdAt?: string };
+  await appendBrowserMemory({
+    id: r.id,
+    fact: r.fact,
+    createdAt: r.createdAt ?? new Date().toISOString(),
+  });
+}
 
 type ToolTracker = ToolCallCardProps & { rowKey: string };
 
@@ -138,13 +160,20 @@ export default function ChatDetailPage({
     let streamRafId = 0;
     let streamErrorSummary: string | null = null;
 
+    const memoriesForRequest =
+      settings.memoryEnabled ? await readBrowserMemory() : undefined;
+
     const settingsPayload = settings;
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: baseline, settings: settingsPayload }),
+        body: JSON.stringify({
+          messages: baseline,
+          settings: settingsPayload,
+          memories: memoriesForRequest,
+        }),
       });
 
       if (!res.ok) {
@@ -216,6 +245,13 @@ export default function ChatDetailPage({
                 }
                 return next;
               });
+            }
+            if (
+              chunk.tool === "remember_user_note" &&
+              chunk.status === "done" &&
+              chunk.result !== undefined
+            ) {
+              void persistRememberUserNoteFromToolResult(chunk.result);
             }
           }
 

@@ -13,9 +13,10 @@ import {
 } from "./tool-runners/files";
 import { captureScreenshotForAssistantTool } from "./tool-runners/screenshot";
 import { getWeather } from "./tool-runners/weather";
-import { addMemory, getMemory } from "./memory";
+import { addMemory } from "./memory";
 import { parseCalendarRangeBounds } from "./calendar-parse";
 import { normalizeFact } from "./memory-policy";
+import type { MemoryEntry } from "./types";
 
 /**
  * Gemini (via @ai-sdk/google) maps empty object schemas to `parameters: undefined`, which
@@ -43,8 +44,13 @@ const calendarRangeInputSchema = z.object({
     ),
 });
 
-export function createJarvixToolset(ctx: { memoryEnabled?: boolean }) {
+export function createJarvixToolset(ctx: {
+  memoryEnabled?: boolean;
+  /** Dedup baseline for remember_user_note (usually merged server + browser snapshot). */
+  memoryDuplicatesBaseline?: MemoryEntry[];
+}) {
   const memoryEnabled = Boolean(ctx.memoryEnabled);
+  const liveDupCheck = [...(ctx.memoryDuplicatesBaseline ?? [])];
   return {
     web_search: tool({
       description:
@@ -228,8 +234,7 @@ export function createJarvixToolset(ctx: { memoryEnabled?: boolean }) {
                   return { saved: false as const, reason: "too_short" };
                 }
                 const key = normalized.toLowerCase();
-                const existing = await getMemory();
-                const dup = existing.some(
+                const dup = liveDupCheck.some(
                   (m) => normalizeFact(m.fact).toLowerCase() === key,
                 );
                 if (dup) {
@@ -239,7 +244,13 @@ export function createJarvixToolset(ctx: { memoryEnabled?: boolean }) {
                 if (!entry) {
                   return { saved: false as const, reason: "rejected" };
                 }
-                return { saved: true as const, id: entry.id };
+                liveDupCheck.push(entry);
+                return {
+                  saved: true as const,
+                  id: entry.id,
+                  fact: entry.fact,
+                  createdAt: entry.createdAt,
+                };
               } catch (e) {
                 return {
                   saved: false as const,
