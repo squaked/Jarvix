@@ -46,9 +46,8 @@ export default function OnboardingFlow() {
   const [weatherLocationDraft, setWeatherLocationDraft] = useState(
     DEFAULT_JARVIX_SETTINGS.weatherLocation,
   );
-  const [calendarPrivacyOpened, setCalendarPrivacyOpened] = useState(false);
+  const [calendarPrivacyDone, setCalendarPrivacyDone] = useState(false);
   const [calendarPrivacyBusy, setCalendarPrivacyBusy] = useState(false);
-  const [showPrivacyFallbackTip, setShowPrivacyFallbackTip] = useState(false);
 
   useEffect(() => {
     if (!bootstrapped) return;
@@ -87,17 +86,12 @@ export default function OnboardingFlow() {
   const openCalendarPrivacy = async () => {
     setCalendarPrivacyBusy(true);
     try {
-      const res = await fetch("/api/open-calendars-privacy", { method: "POST" });
-      const data = (await res.json()) as { calendarAccess?: { jarvixHelperReady?: boolean } };
-      if (data.calendarAccess?.jarvixHelperReady === false) {
-        setShowPrivacyFallbackTip(true);
-      }
-      setCalendarPrivacyOpened(true);
+      await fetch("/api/open-calendars-privacy", { method: "POST" });
     } catch {
-      setShowPrivacyFallbackTip(true);
-      setCalendarPrivacyOpened(true);
+      /* noop */
     } finally {
       setCalendarPrivacyBusy(false);
+      setCalendarPrivacyDone(true);
     }
   };
 
@@ -286,7 +280,7 @@ export default function OnboardingFlow() {
             </motion.div>
           ) : null}
 
-          {/* Step 3: Calendar (macOS privacy) */}
+          {/* Step 3: Calendar access */}
           {stepIdx === 3 ? (
             <motion.div key="macAccess" {...slide} className="flex flex-col gap-6 p-8">
               <button
@@ -304,8 +298,8 @@ export default function OnboardingFlow() {
                   Calendar
                 </h2>
                 <p className="mt-1 text-sm text-muted leading-relaxed">
-                  Tap below to open Calendar privacy in System Settings to authorize the app Jarvix is running on this Mac.
-                  You can finish later in Settings too.
+                  Let Jarvix read your calendar so it can answer questions about your schedule.
+                  You can grant this later in Settings too.
                 </p>
               </div>
               <div className="flex flex-col gap-2">
@@ -316,18 +310,11 @@ export default function OnboardingFlow() {
                   disabled={calendarPrivacyBusy}
                   onClick={() => void openCalendarPrivacy()}
                 >
-                  {calendarPrivacyBusy ? "Preparing…" : "Open Calendar privacy"}
+                  {calendarPrivacyBusy ? "Preparing…" : "Allow Calendar access"}
                 </Button>
-                {calendarPrivacyOpened ? (
+                {calendarPrivacyDone ? (
                   <p className="text-xs" style={{ color: "var(--accent)" }}>
-                    Calendar settings should have opened. Turn Calendars on for Jarvix if you see it, then reload this
-                    page.
-                  </p>
-                ) : null}
-                {showPrivacyFallbackTip ? (
-                  <p className="text-xs text-muted leading-relaxed">
-                    Don’t worry if you don’t see “Jarvix” yet—that’s common with a browser setup. Use Cursor, Terminal,
-                    or Node in the same list if that’s what runs Jarvix on your Mac, or wait a minute and tap again.
+                    Done! If a permissions prompt appeared, tap Allow to confirm.
                   </p>
                 ) : null}
               </div>
