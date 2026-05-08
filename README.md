@@ -14,10 +14,10 @@ That's it. The installer will:
 1. Install any missing tools automatically
 2. Download and build Jarvix in the background
 3. Start Jarvix and open it in your browser
-4. Add a **Jarvix** app to `~/Applications` — drag it to your Dock
+4. Add a **Jarvix** app and an **Update Jarvix** app to `~/Applications` — drag them to your Dock
 5. Keep Jarvix **running in the background** and **auto-update nightly** — no action needed
 
-After install, just click the Jarvix icon in your Dock (or open [http://localhost:3000](http://localhost:3000)) and complete the quick onboarding to add your AI key.
+After install, click the Jarvix icon in your Dock (or open [http://localhost:3000](http://localhost:3000)) and complete the quick onboarding to add your AI key. To update immediately at any time, double-click **Update Jarvix** in your Applications folder.
 
 **To uninstall:** paste this in Terminal:
 ```bash

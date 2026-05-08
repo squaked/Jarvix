@@ -31,8 +31,7 @@ fi
 npm run build --silent
 echo "$(date): Build complete."
 
-# Restart the server LaunchAgent
-launchctl stop com.jarvix.server 2>/dev/null || true
-launchctl start com.jarvix.server 2>/dev/null || true
-
-echo "$(date): Jarvix updated successfully."
+# Signal to the running server that an update is ready.
+# The server shows a "Restart to update" banner; the user restarts at their convenience.
+touch "$INSTALL_DIR/.update-ready"
+echo "$(date): Update ready — banner will appear in the Jarvix UI."

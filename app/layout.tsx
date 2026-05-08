@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { JarvixSettingsProvider } from "@/components/providers/JarvixSettingsProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { UpdateBanner } from "@/components/layout/UpdateBanner";
 import "@/styles/globals.css";
 
 export const metadata: Metadata = {
@@ -27,6 +28,7 @@ export default function RootLayout({
       <body>
         <ThemeProvider>
           <JarvixSettingsProvider>{children}</JarvixSettingsProvider>
+          <UpdateBanner />
         </ThemeProvider>
       </body>
     </html>

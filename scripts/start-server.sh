@@ -6,6 +6,13 @@ set -euo pipefail
 INSTALL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$INSTALL_DIR"
 
+# If another process already owns port 3000, exit cleanly so the LaunchAgent
+# does not spin in a rapid restart loop due to KeepAlive.
+if lsof -ti:3000 >/dev/null 2>&1; then
+  echo "$(date): Port 3000 already in use — another server instance is running."
+  exit 0
+fi
+
 # Ensure a built app exists before trying to start.
 if [ ! -d ".next" ]; then
   echo "$(date): No build found — running first-time build..."
