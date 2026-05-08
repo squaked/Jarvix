@@ -117,9 +117,8 @@ cat > "$SERVER_PLIST" << PLIST
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
-  <true/>
-  <key>ThrottleInterval</key>
-  <integer>10</integer>
+  <false/>
+
   <key>StandardOutPath</key>
   <string>${LOG_DIR}/server.log</string>
   <key>StandardErrorPath</key>
@@ -177,16 +176,63 @@ mkdir -p "$APP_PATH/Contents/MacOS"
 
 cat > "$APP_PATH/Contents/MacOS/Jarvix" << 'APPSCRIPT'
 #!/bin/bash
-# Start server if not responding, then open the browser.
-if ! curl -s --max-time 2 http://localhost:3000 >/dev/null 2>&1; then
-  launchctl start com.jarvix.server 2>/dev/null || true
-  for i in 1 2 3 4 5 6 7 8; do
+# Jarvix.app — the server runs while this app is open.
+# Quitting the app (Cmd+Q or Dock → Quit) stops the server.
+
+INSTALL_DIR="JARVIX_INSTALL_DIR"  # substituted below by sed
+
+# Add Homebrew node to PATH (Apple Silicon + Intel).
+for d in /opt/homebrew/bin /usr/local/bin; do
+  [ -d "$d" ] && export PATH="$d:$PATH"
+done
+
+# ── Quit handler ───────────────────────────────────────────────────────
+# macOS sends SIGTERM when the user quits via Dock or Cmd+Q.
+cleanup() {
+  local pid
+  pid="$(lsof -ti:3000 2>/dev/null | head -1)"
+  if [ -n "$pid" ]; then
+    kill "$pid" 2>/dev/null || true
+    for _ in 1 2 3 4 5; do
+      sleep 1
+      lsof -ti:3000 >/dev/null 2>&1 || break
+    done
+  fi
+  exit 0
+}
+trap cleanup SIGTERM SIGINT SIGHUP
+
+# ── Start server if not already running ───────────────────────────────
+SERVER_PID=""
+if ! lsof -ti:3000 >/dev/null 2>&1; then
+  mkdir -p "$INSTALL_DIR/logs"
+  cd "$INSTALL_DIR"
+  npm start >> "$INSTALL_DIR/logs/server.log" 2>&1 &
+  SERVER_PID=$!
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
     sleep 1
     curl -s --max-time 1 http://localhost:3000 >/dev/null 2>&1 && break
   done
 fi
+
+# ── Open the browser ──────────────────────────────────────────────────
 open "http://localhost:3000"
+
+# ── Stay alive so the Dock icon remains ───────────────────────────────
+if [ -n "$SERVER_PID" ]; then
+  # We started the server — wait on it directly.
+  wait "$SERVER_PID" 2>/dev/null || true
+else
+  # Server was already running (e.g. from login LaunchAgent) —
+  # loop until it disappears or SIGTERM arrives.
+  while lsof -ti:3000 >/dev/null 2>&1; do
+    sleep 5
+  done
+fi
 APPSCRIPT
+
+# Bake the install path into the script (avoids variable-expansion issues in heredoc).
+sed -i '' "s|JARVIX_INSTALL_DIR|${INSTALL_DIR}|g" "$APP_PATH/Contents/MacOS/Jarvix"
 chmod +x "$APP_PATH/Contents/MacOS/Jarvix"
 
 cat > "$APP_PATH/Contents/Info.plist" << INFOPLIST
