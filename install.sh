@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-REPO_URL="${JARVIX_REPO_URL:-https://github.com/squaked/jarvix.git}"
+REPO_URL="${JARVIX_REPO_URL:-https://github.com/squaked/Jarvix.git}"
 INSTALL_DIR="${JARVIX_INSTALL_DIR:-$HOME/.jarvix-app}"
 SERVER_LABEL="com.jarvix.server"
 UPDATER_LABEL="com.jarvix.updater"

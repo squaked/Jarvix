@@ -7,33 +7,53 @@ Local-first chat UI with streaming models (OpenRouter, Google Gemini, Groq), mac
 Open **Terminal** (press `⌘ Space`, type "Terminal", press Enter) and paste:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/jarvix/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/squaked/Jarvix/main/install.sh | bash
 ```
+
+Repository names on GitHub use a capital **J** (`squaked/Jarvix`). If your default branch is not `main`, replace `main` in the URL with your branch name.
 
 That's it. The installer will:
 1. Install any missing tools automatically
 2. Download and build Jarvix in the background
 3. Start Jarvix and open it in your browser
-4. Add a **Jarvix** app and an **Update Jarvix** app to `~/Applications` — drag them to your Dock
-5. Keep Jarvix **running in the background** and **auto-update nightly** — no action needed
+4. Add **Jarvix** to `~/Applications/Jarvix.app` — drag it to your Dock
+5. Keep Jarvix **running in the background** with **nightly updates**; when a new build is ready, a **Restart to apply** button appears in the app
 
-After install, click the Jarvix icon in your Dock (or open [http://localhost:3000](http://localhost:3000)) and complete the quick onboarding to add your AI key. To update immediately at any time, double-click **Update Jarvix** in your Applications folder.
+After install, click the Jarvix icon in your Dock (or open [http://localhost:3000](http://localhost:3000)) and complete the quick onboarding to add your AI key.
 
 **To uninstall:** paste this in Terminal:
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/jarvix/main/scripts/uninstall.sh | bash
+curl -fsSL https://raw.githubusercontent.com/squaked/Jarvix/main/scripts/uninstall.sh | bash
 ```
 
-### Private repo / alternate location
+### If `curl` prints `404: Not Found`
+
+That almost always means either the file is not on GitHub yet (push `install.sh` on `main`), the URL has a typo, **or the repository is private.**
+
+For a **private** repository, unauthenticated `curl` to `raw.githubusercontent.com` returns **404** (GitHub hides whether the file exists). You must send a token **and** give the installer a token so `git clone` works:
 
 ```bash
-# If the repo is private, pass a read-only GitHub token:
-JARVIX_GITHUB_TOKEN=ghp_yourtoken \
-  curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/jarvix/main/install.sh | bash
+export GITHUB_TOKEN=ghp_YOUR_READONLY_CLASSIC_PAT
 
-# To install to a different folder:
+curl -fsSL \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  https://raw.githubusercontent.com/squaked/Jarvix/main/install.sh | \
+  JARVIX_GITHUB_TOKEN="$GITHUB_TOKEN" bash
+```
+
+Use a classic personal access token with **Contents: Read** on this repo (fine-grained PATs also work with `Bearer`). Do not share or commit the token.
+
+### Fork / alternate repo or install directory
+
+```bash
+# Different Git URL (fork or rename):
+JARVIX_REPO_URL=https://github.com/you/your-fork.git \
+  curl -fsSL https://raw.githubusercontent.com/squaked/Jarvix/main/install.sh | bash
+
+# Different install folder:
 JARVIX_INSTALL_DIR=~/my-jarvix \
-  curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/jarvix/main/install.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/squaked/Jarvix/main/install.sh | bash
 ```
 
 ## Development
