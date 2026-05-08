@@ -192,18 +192,22 @@ cleanup() {
 }
 trap cleanup SIGTERM SIGINT SIGHUP
 
-# ── Start server if not already responding ────────────────────────────
+# ── Start server if port 3000 is not already bound ────────────────────
+# Check lsof FIRST (port bound = process already starting or running).
+# Only start a new server if the port is completely free.
 SERVER_PID=""
-if ! /usr/bin/curl -s --max-time 2 http://localhost:3000 >/dev/null 2>&1; then
+if ! /usr/sbin/lsof -ti:3000 >/dev/null 2>&1; then
   mkdir -p "$INSTALL_DIR/logs"
   cd "$INSTALL_DIR"
   npm start >> "$INSTALL_DIR/logs/server.log" 2>&1 &
   SERVER_PID=$!
-  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-    sleep 1
-    /usr/bin/curl -s --max-time 1 http://localhost:3000 >/dev/null 2>&1 && break
-  done
 fi
+
+# Wait for the server to respond over HTTP (covers slow cold-starts).
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
+  sleep 1
+  /usr/bin/curl -s --max-time 1 http://localhost:3000 >/dev/null 2>&1 && break
+done
 
 # ── Open the browser ──────────────────────────────────────────────────
 /usr/bin/open "http://localhost:3000"
@@ -211,10 +215,10 @@ fi
 # ── Stay alive while the server is reachable ──────────────────────────
 # SIGTERM (from Dock quit) is caught by the trap above.
 if [ -n "$SERVER_PID" ]; then
-  # We own the server — wait on it; if it exits, so do we.
+  # We own the server process — wait on it; if it exits, so do we.
   wait "$SERVER_PID" 2>/dev/null || true
 else
-  # Server was already running — poll HTTP until it stops responding.
+  # Server was started externally — poll HTTP until it stops responding.
   while /usr/bin/curl -s --max-time 3 http://localhost:3000 >/dev/null 2>&1; do
     sleep 10
   done

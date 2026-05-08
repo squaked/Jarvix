@@ -9,6 +9,13 @@ APP_PATH="$HOME/Applications/Jarvix.app"
 echo ""
 echo "  Uninstalling Jarvix..."
 
+# Stop the server if it is running.
+SERVER_PID="$(/usr/sbin/lsof -ti:3000 2>/dev/null | head -1)"
+if [ -n "$SERVER_PID" ]; then
+  kill "$SERVER_PID" 2>/dev/null || true
+  sleep 2
+fi
+
 launchctl unload "$SERVER_PLIST"  2>/dev/null || true
 launchctl unload "$UPDATER_PLIST" 2>/dev/null || true
 
@@ -16,11 +23,9 @@ rm -f  "$SERVER_PLIST"
 rm -f  "$UPDATER_PLIST"
 rm -rf "$APP_PATH"
 rm -rf "$INSTALL_DIR"
+rm -rf "$HOME/.jarvix-data"
+rm -rf "$HOME/.jarvis-data"
 
 echo ""
 echo "  ✓ Jarvix removed."
-echo ""
-echo "  Your chat history and settings are kept at:"
-echo "    ~/.jarvix-data  (or ~/.jarvis-data if that's where your data lives)"
-echo "  Delete that folder manually if you want a full clean slate."
 echo ""

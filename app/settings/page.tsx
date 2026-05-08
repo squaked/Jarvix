@@ -7,6 +7,7 @@ import { GroqUsageSection } from "@/components/settings/GroqUsageSection";
 import { MemoryViewer } from "@/components/settings/MemoryViewer";
 import { ProviderForm } from "@/components/settings/ProviderForm";
 import { CheckUpdatesSection } from "@/components/settings/CheckUpdatesSection";
+import { QuitSection } from "@/components/settings/QuitSection";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -54,6 +55,7 @@ export default function SettingsPage() {
         <CalendarAccessCard />
         <MemoryViewer onSaved={notifySaved} />
         <CheckUpdatesSection />
+        <QuitSection />
       </div>
 
       {/* Saved toast */}
