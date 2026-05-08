@@ -150,13 +150,8 @@ cat > "$UPDATER_PLIST" << PLIST
     <key>HOME</key>
     <string>${HOME}</string>
   </dict>
-  <key>StartCalendarInterval</key>
-  <dict>
-    <key>Hour</key>
-    <integer>3</integer>
-    <key>Minute</key>
-    <integer>0</integer>
-  </dict>
+  <key>StartInterval</key>
+  <integer>1800</integer>
   <key>StandardOutPath</key>
   <string>${LOG_DIR}/update.log</string>
   <key>StandardErrorPath</key>
@@ -167,7 +162,7 @@ PLIST
 
 launchctl unload "$UPDATER_PLIST" 2>/dev/null || true
 launchctl load "$UPDATER_PLIST"
-ok "Auto-updater installed (runs nightly at 3 AM)"
+ok "Auto-updater installed (runs every 30 minutes)"
 
 # ── 9. Jarvix.app in ~/Applications ───────────────────────────────────────────
 step "Creating Jarvix app launcher..."
@@ -181,52 +176,47 @@ cat > "$APP_PATH/Contents/MacOS/Jarvix" << 'APPSCRIPT'
 
 INSTALL_DIR="JARVIX_INSTALL_DIR"  # substituted below by sed
 
-# Add Homebrew node to PATH (Apple Silicon + Intel).
-for d in /opt/homebrew/bin /usr/local/bin; do
-  [ -d "$d" ] && export PATH="$d:$PATH"
-done
+# Full explicit PATH so system tools and Homebrew node are always found.
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin"
+
+# Export install dir so the child Next.js server can find the update marker.
+export JARVIX_INSTALL_DIR="$INSTALL_DIR"
 
 # ── Quit handler ───────────────────────────────────────────────────────
 # macOS sends SIGTERM when the user quits via Dock or Cmd+Q.
 cleanup() {
   local pid
-  pid="$(lsof -ti:3000 2>/dev/null | head -1)"
-  if [ -n "$pid" ]; then
-    kill "$pid" 2>/dev/null || true
-    for _ in 1 2 3 4 5; do
-      sleep 1
-      lsof -ti:3000 >/dev/null 2>&1 || break
-    done
-  fi
+  pid="$(/usr/sbin/lsof -ti:3000 2>/dev/null | head -1)"
+  [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
   exit 0
 }
 trap cleanup SIGTERM SIGINT SIGHUP
 
-# ── Start server if not already running ───────────────────────────────
+# ── Start server if not already responding ────────────────────────────
 SERVER_PID=""
-if ! lsof -ti:3000 >/dev/null 2>&1; then
+if ! /usr/bin/curl -s --max-time 2 http://localhost:3000 >/dev/null 2>&1; then
   mkdir -p "$INSTALL_DIR/logs"
   cd "$INSTALL_DIR"
   npm start >> "$INSTALL_DIR/logs/server.log" 2>&1 &
   SERVER_PID=$!
-  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
     sleep 1
-    curl -s --max-time 1 http://localhost:3000 >/dev/null 2>&1 && break
+    /usr/bin/curl -s --max-time 1 http://localhost:3000 >/dev/null 2>&1 && break
   done
 fi
 
 # ── Open the browser ──────────────────────────────────────────────────
-open "http://localhost:3000"
+/usr/bin/open "http://localhost:3000"
 
-# ── Stay alive so the Dock icon remains ───────────────────────────────
+# ── Stay alive while the server is reachable ──────────────────────────
+# SIGTERM (from Dock quit) is caught by the trap above.
 if [ -n "$SERVER_PID" ]; then
-  # We started the server — wait on it directly.
+  # We own the server — wait on it; if it exits, so do we.
   wait "$SERVER_PID" 2>/dev/null || true
 else
-  # Server was already running (e.g. from login LaunchAgent) —
-  # loop until it disappears or SIGTERM arrives.
-  while lsof -ti:3000 >/dev/null 2>&1; do
-    sleep 5
+  # Server was already running — poll HTTP until it stops responding.
+  while /usr/bin/curl -s --max-time 3 http://localhost:3000 >/dev/null 2>&1; do
+    sleep 10
   done
 fi
 APPSCRIPT

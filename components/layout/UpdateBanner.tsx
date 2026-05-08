@@ -22,7 +22,7 @@ export function UpdateBanner() {
 
   useEffect(() => {
     checkForUpdate();
-    const id = setInterval(checkForUpdate, 60_000);
+    const id = setInterval(checkForUpdate, 15_000);
     return () => clearInterval(id);
   }, [checkForUpdate]);
 
