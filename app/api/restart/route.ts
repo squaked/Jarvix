@@ -1,17 +1,11 @@
 import { NextResponse } from "next/server";
+import { getJarvixInstallDir } from "@/lib/jarvix-install-dir";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
-function getInstallDir(): string {
-  return (
-    process.env.JARVIX_INSTALL_DIR ||
-    path.join(process.env.HOME ?? "", ".jarvix-app")
-  );
-}
-
 export async function POST() {
-  const installDir = getInstallDir();
+  const installDir = getJarvixInstallDir();
   const markerPath = path.join(installDir, ".update-ready");
   const relaunchScript = path.join(installDir, "scripts", "relaunch.sh");
 

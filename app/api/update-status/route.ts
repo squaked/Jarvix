@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
+import { getJarvixInstallDir } from "@/lib/jarvix-install-dir";
 import fs from "node:fs";
 import path from "node:path";
 
 function getMarkerPath(): string {
-  const installDir =
-    process.env.JARVIX_INSTALL_DIR ||
-    path.join(process.env.HOME ?? "", ".jarvix-app");
-  return path.join(installDir, ".update-ready");
+  return path.join(getJarvixInstallDir(), ".update-ready");
 }
 
 export async function GET() {

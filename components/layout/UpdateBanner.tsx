@@ -9,6 +9,19 @@ const POLL_INTERVAL_MS = 60_000; // background poll for the .update-ready marker
 const RESTART_GRACE_MS = 90_000; // give the server up to 90s to come back
 const RESTART_POLL_MS = 1_500;
 
+/** Avoid silent failures when AbortSignal.timeout is missing (some WebKit builds). */
+function fetchTimeoutSignal(ms: number): AbortSignal {
+  if (
+    typeof AbortSignal !== "undefined" &&
+    typeof AbortSignal.timeout === "function"
+  ) {
+    return AbortSignal.timeout(ms);
+  }
+  const ctrl = new AbortController();
+  setTimeout(() => ctrl.abort(), ms);
+  return ctrl.signal;
+}
+
 export function UpdateBanner() {
   const [phase, setPhase] = useState<Phase>("idle");
   const phaseRef = useRef(phase);
@@ -20,7 +33,7 @@ export function UpdateBanner() {
     try {
       const res = await fetch("/api/update-status", {
         cache: "no-store",
-        signal: AbortSignal.timeout(3000),
+        signal: fetchTimeoutSignal(3000),
       });
       if (!res.ok) return;
       const data = (await res.json()) as { ready?: boolean };
@@ -63,7 +76,7 @@ export function UpdateBanner() {
     const poll = () => {
       fetch("/api/update-status", {
         cache: "no-store",
-        signal: AbortSignal.timeout(2000),
+        signal: fetchTimeoutSignal(2000),
       })
         .then((r) => {
           if (r.ok) {

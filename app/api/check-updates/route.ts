@@ -1,17 +1,11 @@
 import { NextResponse } from "next/server";
+import { getJarvixInstallDir } from "@/lib/jarvix-install-dir";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs";
 import path from "node:path";
 
 const exec = promisify(execFile);
-
-function getInstallDir(): string {
-  return (
-    process.env.JARVIX_INSTALL_DIR ||
-    path.join(process.env.HOME ?? "", ".jarvix-app")
-  );
-}
 
 type CheckResult =
   | { upToDate: true }
@@ -20,7 +14,7 @@ type CheckResult =
   | { error: string };
 
 export async function POST(): Promise<NextResponse<CheckResult>> {
-  const installDir = getInstallDir();
+  const installDir = getJarvixInstallDir();
   const updateScript = path.join(installDir, "scripts", "update.sh");
   const lockDir = path.join(installDir, ".update.lock");
   const readyMarker = path.join(installDir, ".update-ready");
