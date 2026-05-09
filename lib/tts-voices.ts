@@ -15,7 +15,10 @@ const VOICE_SET = new Set<string>(
   ORPHEUS_ENGLISH_VOICES.map((v) => v.id),
 );
 
-/** Short sample within Orpheus’s 200-character limit (also used for Settings browser preview copy). */
+/**
+ * Short sample within Orpheus’s 200-character limit (bundled WAV previews + fallback speech).
+ * When changing strings, rerun `npm run generate:tts-previews` and sync `scripts/generate-tts-previews.mjs`.
+ */
 export const TTS_VOICE_SAMPLE: Record<TtsVoiceId, string> = {
   troy: "Hi, I’m Troy — this is how I sound in Jarvix. Easy and conversational.",
   austin:

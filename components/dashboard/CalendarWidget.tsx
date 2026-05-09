@@ -1,5 +1,6 @@
 "use client";
 
+import { fetchCalendarWidgetData } from "@/lib/widgets-calendar-client";
 import { useEffect, useState } from "react";
 
 type CalendarEvent = {
@@ -34,12 +35,7 @@ export function CalendarWidget() {
   useEffect(() => {
     void (async () => {
       try {
-        const res = await fetch("/api/widgets/calendar");
-        const data = (await res.json()) as {
-          events?: CalendarEvent[];
-          accessGranted?: boolean;
-          hint?: string;
-        };
+        const data = await fetchCalendarWidgetData();
 
         if (!data.accessGranted && (!data.events || data.events.length === 0)) {
           setState({ status: "no-access" });
@@ -72,9 +68,7 @@ export function CalendarWidget() {
 
       {state.status === "loading" && (
         <div className="space-y-3">
-          {[1, 2].map((i) => (
-            <div key={i} className="shimmer h-10 rounded-xl" />
-          ))}
+          <div className="shimmer h-10 rounded-xl" />
         </div>
       )}
 
@@ -101,7 +95,7 @@ export function CalendarWidget() {
             const active = isNowBetween(ev.start, ev.end);
             return (
               <li
-                key={i}
+                key={`${ev.start}-${ev.title}-${i}`}
                 className="flex items-start gap-3 group"
               >
                 <div

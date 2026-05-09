@@ -1,6 +1,7 @@
 "use client";
 
 import { useJarvixSettings } from "@/lib/settings";
+import { fetchCalendarWidgetData } from "@/lib/widgets-calendar-client";
 import { useEffect, useState } from "react";
 
 type CalEvent = { title: string; start: string; end: string };
@@ -63,9 +64,7 @@ export function GreetingBlock() {
 
     void (async () => {
       try {
-        const res = await fetch("/api/widgets/calendar");
-        if (!res.ok) return;
-        const data = (await res.json()) as { events?: CalEvent[] };
+        const data = await fetchCalendarWidgetData();
         if (cancelled) return;
         const events = (data.events ?? []).sort(
           (a, b) =>

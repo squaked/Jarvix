@@ -30,7 +30,7 @@ function pickSuggestions(): Suggestion[] {
       pool[j] = a;
     }
   }
-  return pool.slice(0, 5);
+  return pool.slice(0, 4);
 }
 
 type Props = {

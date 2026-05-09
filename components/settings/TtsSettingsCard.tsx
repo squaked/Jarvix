@@ -4,10 +4,9 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import {
   ORPHEUS_ENGLISH_VOICES,
-  TTS_VOICE_SAMPLE,
 } from "@/lib/tts-voices";
 import { ORPHEUS_ENGLISH_TERMS_PLAYGROUND_URL } from "@/lib/groq-user-error-message";
-import { speakBrowserTtsPreview } from "@/lib/tts-browser-preview";
+import { playBundledOrFallbackTtsPreview } from "@/lib/play-tts-preview";
 import { useJarvixSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import type { TtsVoiceId } from "@/lib/types";
@@ -32,8 +31,7 @@ export function TtsSettingsCard({ onSaved }: Props) {
     setPreviewError(null);
     setPreviewBusy(voiceId);
     try {
-      const sample = TTS_VOICE_SAMPLE[voiceId];
-      await speakBrowserTtsPreview(voiceId, sample);
+      await playBundledOrFallbackTtsPreview(voiceId);
     } catch {
       setPreviewError(
         "Speech preview unavailable — allow audio / try another browser.",
@@ -114,8 +112,20 @@ export function TtsSettingsCard({ onSaved }: Props) {
       <div className="space-y-2">
         <p className="text-sm font-medium text-text">Voice</p>
         <p className="text-xs text-muted">
-          Play previews use your browser&apos;s speech synthesis (not identical to
-          Orpheus); read-aloud in chat uses Groq.
+          Previews prefer bundled WAVs in{" "}
+          <code className="rounded bg-border/40 px-1 py-0.5 font-mono text-[10px]">
+            public/tts-previews/
+          </code>
+          ({`run `}
+          <code className="rounded bg-border/40 px-1 py-0.5 font-mono text-[10px]">
+            npm run generate:tts-previews
+          </code>
+          {` with `}
+          <code className="rounded bg-border/40 px-1 py-0.5 font-mono text-[10px]">
+            GROQ_API_KEY
+          </code>
+          {`). If files are missing, previews use the browser voice instead. Chat `}
+          read-aloud still uses Groq with your saved key.
         </p>
         {previewError ? (
           <p
