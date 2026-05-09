@@ -7,6 +7,7 @@ import {
   TTS_VOICE_SAMPLE,
 } from "@/lib/tts-voices";
 import { ORPHEUS_ENGLISH_TERMS_PLAYGROUND_URL } from "@/lib/groq-user-error-message";
+import { speakBrowserTtsPreview } from "@/lib/tts-browser-preview";
 import { useJarvixSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import type { TtsVoiceId } from "@/lib/types";
@@ -31,40 +32,11 @@ export function TtsSettingsCard({ onSaved }: Props) {
     setPreviewError(null);
     setPreviewBusy(voiceId);
     try {
-      const text = TTS_VOICE_SAMPLE[voiceId];
-      const res = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice: voiceId, settings }),
-      });
-      if (!res.ok) {
-        let msg =
-          res.status === 401
-            ? "Add your Groq API key (or set GROQ_API_KEY on the server) to use previews."
-            : `Preview failed (${res.status}).`;
-        try {
-          const err = (await res.json()) as { error?: string };
-          if (typeof err.error === "string" && err.error.trim()) {
-            msg = err.error.trim();
-          }
-        } catch {
-          /* noop */
-        }
-        setPreviewError(msg);
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audio.onended = () => URL.revokeObjectURL(url);
-      audio.onerror = () => {
-        URL.revokeObjectURL(url);
-        setPreviewError("Playback failed.");
-      };
-      await audio.play();
+      const sample = TTS_VOICE_SAMPLE[voiceId];
+      await speakBrowserTtsPreview(voiceId, sample);
     } catch {
       setPreviewError(
-        "Playback blocked or network error — allow audio or try again.",
+        "Speech preview unavailable — allow audio / try another browser.",
       );
     } finally {
       setPreviewBusy(null);
@@ -91,20 +63,17 @@ export function TtsSettingsCard({ onSaved }: Props) {
             Orpheus text-to-speech
           </a>{" "}
           with your Groq API key — same billing as chat. Each segment is limited
-          to 200 characters; long replies play in sequence.
-        </p>
-        <p className="mt-2 text-xs text-muted">
-          If previews fail with terms or model acceptance, ask your Groq workspace
-          admin to{" "}
+          to 200 characters; long replies play in sequence. Orpheus may require a
+          one-time{" "}
           <a
             className="text-accent underline-offset-4 hover:underline"
             href={ORPHEUS_ENGLISH_TERMS_PLAYGROUND_URL}
             target="_blank"
             rel="noreferrer"
           >
-            open Orpheus in Console once
+            terms acceptance
           </a>{" "}
-          and accept the model terms.
+          in Groq Console for org admins.
         </p>
       </div>
 
@@ -144,6 +113,10 @@ export function TtsSettingsCard({ onSaved }: Props) {
 
       <div className="space-y-2">
         <p className="text-sm font-medium text-text">Voice</p>
+        <p className="text-xs text-muted">
+          Play previews use your browser&apos;s speech synthesis (not identical to
+          Orpheus); read-aloud in chat uses Groq.
+        </p>
         {previewError ? (
           <p
             className="rounded-xl border border-red-500/30 bg-red-500/[0.07] px-3 py-2 text-sm text-red-600 dark:text-red-400"

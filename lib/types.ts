@@ -26,13 +26,7 @@ export type AgentPersonalization = {
 };
 
 /** Groq Orpheus English TTS voice IDs (canopylabs/orpheus-v1-english). */
-export type TtsVoiceId =
-  | "autumn"
-  | "diana"
-  | "hannah"
-  | "austin"
-  | "daniel"
-  | "troy";
+export type TtsVoiceId = "troy" | "austin" | "autumn" | "hannah";
 
 /** Read-aloud settings (Groq [text-to-speech / Orpheus](https://console.groq.com/docs/text-to-speech/orpheus)). */
 export type TtsSettings = {

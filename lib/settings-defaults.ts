@@ -27,6 +27,6 @@ export const DEFAULT_JARVIX_SETTINGS: Settings = {
   tts: {
     enabled: false,
     autoReadReplies: true,
-    voice: "hannah",
+    voice: "troy",
   },
 };

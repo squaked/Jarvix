@@ -1,35 +1,29 @@
 import type { TtsVoiceId } from "./types";
 
-/** English Orpheus personas (see Groq Orpheus docs). */
+/** English Orpheus personas Jarvix exposes (see Groq Orpheus docs). */
 export const ORPHEUS_ENGLISH_VOICES: readonly {
   id: TtsVoiceId;
   label: string;
 }[] = [
-  { id: "autumn", label: "Autumn" },
-  { id: "diana", label: "Diana" },
-  { id: "hannah", label: "Hannah" },
-  { id: "austin", label: "Austin" },
-  { id: "daniel", label: "Daniel" },
   { id: "troy", label: "Troy" },
+  { id: "austin", label: "Austin" },
+  { id: "autumn", label: "Autumn" },
+  { id: "hannah", label: "Hannah" },
 ] as const;
 
 const VOICE_SET = new Set<string>(
   ORPHEUS_ENGLISH_VOICES.map((v) => v.id),
 );
 
-/** Short sample within Orpheus’s 200-character limit (for previews). */
+/** Short sample within Orpheus’s 200-character limit (also used for Settings browser preview copy). */
 export const TTS_VOICE_SAMPLE: Record<TtsVoiceId, string> = {
-  autumn:
-    "Hi, I’m Autumn — this is how I sound in Jarvix. [friendly] Nice to meet you.",
-  diana:
-    "Hi, I’m Diana — this is how I sound in Jarvix. [professionally] Ready when you are.",
-  hannah:
-    "Hi, I’m Hannah — this is how I sound in Jarvix. [warm] Thanks for listening.",
+  troy: "Hi, I’m Troy — this is how I sound in Jarvix. Easy and conversational.",
   austin:
     "Hi, I’m Austin — this is how I sound in Jarvix. [casual] Let’s get going.",
-  daniel:
-    "Hi, I’m Daniel — this is how I sound in Jarvix. [clear] All set over here.",
-  troy: "Hi, I’m Troy — this is how I sound in Jarvix. Easy and conversational.",
+  autumn:
+    "Hi, I’m Autumn — this is how I sound in Jarvix. [friendly] Nice to meet you.",
+  hannah:
+    "Hi, I’m Hannah — this is how I sound in Jarvix. [warm] Thanks for listening.",
 };
 
 export const ORPHEUS_TTS_MODEL =
