@@ -3,6 +3,7 @@
 import { Card } from "@/components/ui/Card";
 import { jarvixDisplayVersion } from "@/lib/jarvix-version-display";
 import {
+  kickJarvixUpdateBannerStatus,
   clearJarvixUpdateFastPollWindow,
   startJarvixUpdateFastPollWindow,
 } from "@/lib/jarvix-update-poll";
@@ -44,7 +45,8 @@ export function CheckUpdatesSection() {
         throw new Error(data.error || `Server error ${res.status}`);
       }
       if (data.ready) {
-        clearJarvixUpdateFastPollWindow();
+        // Keep fast polling; tell the banner to read status immediately.
+        kickJarvixUpdateBannerStatus();
         setStatus("ready");
       } else if (data.upToDate) {
         clearJarvixUpdateFastPollWindow();

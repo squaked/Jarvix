@@ -2,11 +2,13 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  JARVIX_UPDATE_BANNER_KICK_EVENT,
   JARVIX_UPDATE_BUILD_IDLE_EVENT,
   JARVIX_UPDATE_BUILD_STARTED_EVENT,
   clearJarvixUpdateFastPollWindow,
   jarvixUpdateFastPollRemainingMs,
 } from "@/lib/jarvix-update-poll";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type Phase = "idle" | "ready" | "restarting" | "waiting";
@@ -30,6 +32,7 @@ function fetchTimeoutSignal(ms: number): AbortSignal {
 }
 
 export function UpdateBanner() {
+  const pathname = usePathname();
   const [phase, setPhase] = useState<Phase>("idle");
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
@@ -78,6 +81,7 @@ export function UpdateBanner() {
       const useFast = jarvixUpdateFastPollRemainingMs() > 0;
       const ms = useFast ? POLL_FAST_MS : POLL_SLOW_MS;
       intervalId = setInterval(() => void checkForUpdate(), ms);
+      void checkForUpdate();
     };
 
     const bump = () => {
@@ -91,6 +95,9 @@ export function UpdateBanner() {
     window.addEventListener(JARVIX_UPDATE_BUILD_STARTED_EVENT, bump);
     window.addEventListener(JARVIX_UPDATE_BUILD_IDLE_EVENT, reinstallTimer);
 
+    const onKick = () => void checkForUpdate();
+    window.addEventListener(JARVIX_UPDATE_BANNER_KICK_EVENT, onKick);
+
     // Re-check immediately when the user returns to the tab so a long-idle
     // session doesn't have to wait a full interval to surface a new update.
     const onVisible = () => {
@@ -102,9 +109,15 @@ export function UpdateBanner() {
       if (intervalId !== undefined) clearInterval(intervalId);
       window.removeEventListener(JARVIX_UPDATE_BUILD_STARTED_EVENT, bump);
       window.removeEventListener(JARVIX_UPDATE_BUILD_IDLE_EVENT, reinstallTimer);
+      window.removeEventListener(JARVIX_UPDATE_BANNER_KICK_EVENT, onKick);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [checkForUpdate]);
+
+  /** Any in-app navigation re-checks promptly (e.g. left Settings while a build finished). */
+  useEffect(() => {
+    void checkForUpdate();
+  }, [pathname, checkForUpdate]);
 
   const handleRestart = useCallback(async () => {
     setPhase("restarting");

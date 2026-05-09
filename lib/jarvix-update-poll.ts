@@ -3,6 +3,8 @@ export const JARVIX_UPDATE_FAST_POLL_UNTIL_KEY = "jarvix-update-fast-poll-until"
 
 export const JARVIX_UPDATE_BUILD_STARTED_EVENT = "jarvix-update-build-started";
 export const JARVIX_UPDATE_BUILD_IDLE_EVENT = "jarvix-update-build-idle";
+/** Explicit “re-read `/api/update-status` now” (e.g. check-updates POST returned `{ ready }`). */
+export const JARVIX_UPDATE_BANNER_KICK_EVENT = "jarvix-update-banner-kick";
 
 /** Default: keep checking often for 45m after user hits “Check for updates” (build can take a while). */
 const DEFAULT_FAST_POLL_WINDOW_MS = 45 * 60 * 1000;
@@ -39,5 +41,14 @@ export function jarvixUpdateFastPollRemainingMs(): number {
     return Math.max(0, until - Date.now());
   } catch {
     return 0;
+  }
+}
+
+export function kickJarvixUpdateBannerStatus(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new CustomEvent(JARVIX_UPDATE_BANNER_KICK_EVENT));
+  } catch {
+    /* noop */
   }
 }
