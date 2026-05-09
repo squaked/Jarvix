@@ -22,6 +22,7 @@ const STEPS = [
   { id: "voice",     label: "Voice" },
   { id: "weather",   label: "Weather" },
   { id: "calendar",  label: "Calendar" },
+  { id: "dock",     label: "Dock" },
   { id: "key",       label: "Connect" },
 ] as const;
 
@@ -408,9 +409,48 @@ export default function OnboardingFlow() {
                   </p>
                 )}
               </div>
+              <Button type="button" className="w-full" onClick={goNext}>
+                Continue
+              </Button>
+            </motion.div>
+          )}
+
+          {stepId === "dock" && (
+            <motion.div key="dock" {...slide} className="flex flex-col gap-6 p-8">
+              <BackLink onBack={goBack} />
+              <div>
+                <h2
+                  className="font-display text-2xl font-medium text-text"
+                  style={{ fontVariationSettings: '"opsz" 28' }}
+                >
+                  Add to your Dock
+                </h2>
+                <p className="mt-1 text-sm text-muted leading-relaxed">
+                  Keep Jarvix one click away. We&apos;ll show you where the app is so you can drag it to your Dock.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-dashed border-border/60 bg-surface-2/30 p-6 flex flex-col items-center gap-4 text-center">
+                <div className="w-12 h-12 rounded-xl bg-bg border border-border flex items-center justify-center shadow-sm">
+                  <span className="text-xl">📥</span>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-text">Drag Jarvix to the Dock</p>
+                  <p className="text-xs text-muted">A Finder window will open with the app selected.</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full"
+                  onClick={() => fetch("/api/reveal-app", { method: "POST" })}
+                >
+                  Reveal in Finder
+                </Button>
+              </div>
+
               <div className="flex flex-col gap-2">
                 <Button type="button" className="w-full" onClick={goNext}>
-                  Continue
+                  I&apos;ve added it
                 </Button>
                 <Button
                   type="button"
