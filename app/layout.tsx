@@ -7,6 +7,10 @@ import "@/styles/globals.css";
 export const metadata: Metadata = {
   title: "Jarvix OS",
   description: "Your personal AI command center",
+  icons: {
+    icon: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export const viewport: Viewport = {

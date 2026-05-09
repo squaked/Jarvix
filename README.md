@@ -12,11 +12,9 @@ Open **Terminal** (press `⌘ Space`, type "Terminal", press Enter) and paste:
 curl -fsSL https://raw.githubusercontent.com/squaked/Jarvix/main/install.sh | bash
 ```
 
-
 ## Open
 
 Press `⌘ Space`, type **Jarvix**, press Enter — or click the Jarvix icon in your Dock.
-
 
 <br/>
 <br/>
@@ -24,15 +22,13 @@ Press `⌘ Space`, type **Jarvix**, press Enter — or click the Jarvix icon in 
 
 ---
 
-
 **Manual update**
 
-You can update in the app's settings too.
+Updating can be done in the app's settings.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/squaked/Jarvix/main/install.sh | bash
 ```
-
 
 **Uninstall**
 

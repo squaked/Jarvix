@@ -10,6 +10,7 @@ import { CheckUpdatesSection } from "@/components/settings/CheckUpdatesSection";
 import { QuitSection } from "@/components/settings/QuitSection";
 import { ThemeCard } from "@/components/settings/ThemeCard";
 import { TtsSettingsCard } from "@/components/settings/TtsSettingsCard";
+import { AboutCard } from "@/components/settings/AboutCard";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -73,6 +74,10 @@ export default function SettingsPage() {
           <GroqUsageSection />
           <CheckUpdatesSection />
           <QuitSection />
+        </Section>
+
+        <Section title="About">
+          <AboutCard />
         </Section>
       </div>
 

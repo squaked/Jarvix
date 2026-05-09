@@ -133,6 +133,9 @@ export function GreetingBlock() {
 
   return (
     <div className="flex flex-col items-center gap-1 text-center">
+      <div className="mb-4 h-14 w-14 rounded-2xl overflow-hidden shadow-warm border border-border/40 animate-fade-up">
+        <img src="/icon.png" alt="Jarvix" className="w-full h-full object-cover" />
+      </div>
       <p className="text-sm font-medium text-muted animate-fade-up stagger-1">
         {formatDate(now)} · {formatTime(now)}
       </p>
