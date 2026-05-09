@@ -23,7 +23,12 @@ function pickSuggestions(): Suggestion[] {
   const pool = [...SUGGESTION_POOL];
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [pool[i]!, pool[j]!] = [pool[j]!, pool[i]!];
+    const a = pool[i];
+    const b = pool[j];
+    if (a !== undefined && b !== undefined) {
+      pool[i] = b;
+      pool[j] = a;
+    }
   }
   return pool.slice(0, 5);
 }
