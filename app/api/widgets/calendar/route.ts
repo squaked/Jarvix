@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
  * the slow AppleScript helper more than once every few minutes.
  */
 let cache: { t: number; data: any } | null = null;
-const SERVER_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+const SERVER_CACHE_TTL_MS = 10_000; // 10 seconds (enough for deduping, but feels real-time)
 
 export async function GET() {
   if (cache && Date.now() - cache.t < SERVER_CACHE_TTL_MS) {

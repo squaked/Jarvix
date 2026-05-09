@@ -4,7 +4,7 @@ import type { CalendarReadResult } from "@/lib/tool-runners/eventkit";
 import { readCalendarWidgetCache, writeCalendarWidgetCache } from "./calendar-widget-cache";
 
 /** Memory stale time - brief deduping. */
-const STALE_MS = 30_000;
+const STALE_MS = 10_000;
 
 let inflight: Promise<CalendarReadResult> | null = null;
 let last: { t: number; data: CalendarReadResult } | null = null;

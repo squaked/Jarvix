@@ -30,9 +30,13 @@ echo "  ╚═══════════════════════
 if ! command -v brew &>/dev/null; then
   step "Installing Homebrew (this may ask for your password)..."
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-  eval "$(/opt/homebrew/bin/brew shellenv)" 2>/dev/null \
-    || eval "$(/usr/local/bin/brew shellenv)" 2>/dev/null \
-    || fail "Homebrew installed but could not be found."
+  # Initialize brew for this session
+  if [ -f "/opt/homebrew/bin/brew" ]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+  elif [ -f "/usr/local/bin/brew" ]; then
+    eval "$(/usr/local/bin/brew shellenv)"
+  fi
+  command -v brew &>/dev/null || fail "Homebrew installed but not found in PATH. Please restart your terminal and re-run."
   ok "Homebrew installed"
 else
   ok "Homebrew found"
@@ -40,10 +44,15 @@ fi
 
 # ── 2. Git / Xcode Tools ──────────────────────────────────────────────────────
 if ! command -v git &>/dev/null; then
-  step "Installing Git..."
+  step "Installing Git & Xcode Command Line Tools..."
+  echo "    (Please click 'Install' on the macOS popup that just appeared)"
   xcode-select --install 2>/dev/null || true
-  for i in $(seq 1 36); do sleep 5; command -v git &>/dev/null && break; done
-  command -v git &>/dev/null || fail "Git is required."
+  # Wait for user to finish installation
+  for i in $(seq 1 60); do
+    if command -v git &>/dev/null; then break; fi
+    sleep 10
+  done
+  command -v git &>/dev/null || fail "Git is required. Please install Xcode Command Line Tools then re-run this script."
   ok "Git installed"
 else
   ok "Git found"
@@ -64,7 +73,7 @@ NODE_DIR="$(dirname "$NODE_BIN")"
 
 # ── 4. Clone or update repo ────────────────────────────────────────────────────
 if [ -d "$INSTALL_DIR/.git" ]; then
-  step "Updating Jarvix..."
+  step "Updating Jarvix code..."
   git -C "$INSTALL_DIR" pull --ff-only 2>&1 | sed 's/^/    /'
   ok "Code updated"
 else
@@ -78,7 +87,18 @@ step "Installing dependencies and building (about 1 minute)..."
 cd "$INSTALL_DIR"
 "$NPM_BIN" install --silent
 "$NPM_BIN" run build --silent
-ok "Build complete"
+ok "Web app build complete"
+
+# ── 5.5. Build Native Swift Helper (for Calendar) ─────────────────────────────
+step "Building native Calendar helper..."
+HELPER_BUILD_SCRIPT="$INSTALL_DIR/scripts/macos/JarvixEventKitHelper/build.sh"
+if [ -f "$HELPER_BUILD_SCRIPT" ]; then
+  chmod +x "$HELPER_BUILD_SCRIPT"
+  /bin/bash "$HELPER_BUILD_SCRIPT" > /dev/null 2>&1 || echo "    (Native helper build skipped, using fallback)"
+  ok "Native helper ready"
+else
+  echo "    (Build script missing, skipping native helper)"
+fi
 
 # ── 6. Log directory ───────────────────────────────────────────────────────────
 mkdir -p "$LOG_DIR"
@@ -113,10 +133,6 @@ cat > "$SERVER_PLIST" << PLIST
   <true/>
   <key>KeepAlive</key>
   <false/>
-  <key>StandardOutPath</key>
-  <string>${LOG_DIR}/server.log</string>
-  <key>StandardErrorPath</key>
-  <string>${LOG_DIR}/server.log</string>
 </dict>
 </plist>
 PLIST
@@ -146,10 +162,6 @@ cat > "$UPDATER_PLIST" << PLIST
   </dict>
   <key>StartInterval</key>
   <integer>21600</integer>
-  <key>StandardOutPath</key>
-  <string>${LOG_DIR}/update.log</string>
-  <key>StandardErrorPath</key>
-  <string>${LOG_DIR}/update.log</string>
 </dict>
 </plist>
 PLIST
@@ -159,7 +171,7 @@ launchctl load "$UPDATER_PLIST"
 ok "Auto-updater installed"
 
 # ── 9. Jarvix.app in ~/Applications ───────────────────────────────────────────
-step "Creating Jarvix app launcher (using native AppleScript wrapper)..."
+step "Creating Jarvix app launcher..."
 mkdir -p "$HOME/Applications"
 
 # 1. Create the bash launcher script
@@ -168,13 +180,10 @@ mkdir -p "$(dirname "$LAUNCHER_SCRIPT")"
 
 cat > "$LAUNCHER_SCRIPT" << 'APPSCRIPT'
 #!/bin/bash
-# This script is called by the Jarvix.app wrapper.
-
 INSTALL_DIR="__JARVIX_INSTALL_DIR_PLACEHOLDER__"
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin"
 export JARVIX_INSTALL_DIR="$INSTALL_DIR"
 
-# Cleanup on quit
 cleanup() {
   local pid
   pid="$(/usr/sbin/lsof -ti:3000 -sTCP:LISTEN 2>/dev/null | head -1)"
@@ -183,20 +192,16 @@ cleanup() {
 }
 trap cleanup SIGTERM SIGINT SIGHUP
 
-# Start server if needed
 if ! /usr/sbin/lsof -ti:3000 -sTCP:LISTEN >/dev/null 2>&1; then
   cd "$INSTALL_DIR"
   nohup npm start > /dev/null 2>&1 &
   disown || true
 fi
 
-# Open browser immediately
 /usr/bin/open "http://localhost:3000"
 
-# Stay alive to monitor server
 while true; do
   if ! /usr/bin/curl -fs --max-time 3 http://localhost:3000 >/dev/null 2>&1; then
-    # Try restart after 60s down
     sleep 60
     if ! /usr/bin/curl -fs --max-time 3 http://localhost:3000 >/dev/null 2>&1; then
        cd "$INSTALL_DIR"
@@ -211,12 +216,11 @@ APPSCRIPT
 sed -i '' "s|__JARVIX_INSTALL_DIR_PLACEHOLDER__|${INSTALL_DIR}|g" "$LAUNCHER_SCRIPT"
 chmod +x "$LAUNCHER_SCRIPT"
 
-# 2. Use osacompile to create a real .app that doesn't bounce
-# This signals "finished launching" immediately.
+# 2. Build the app bundle
 rm -rf "$APP_PATH"
 osacompile -o "$APP_PATH" -e "do shell script \"$LAUNCHER_SCRIPT > /dev/null 2>&1 &\""
 
-# 2. Convert the PNG icon to a real PNG then to ICNS
+# 3. Apply Icon and Metadata
 ICON_NAME="JarvixIcon"
 REAL_PNG="/tmp/jarvix_icon_real.png"
 ICONSET_DIR="/tmp/Jarvix.iconset"
@@ -228,25 +232,24 @@ for size in 16 32 128 256 512; do
 done
 iconutil -c icns "$ICONSET_DIR" -o "$APP_PATH/Contents/Resources/${ICON_NAME}.icns" 2>/dev/null || true
 
-# Update Info.plist to be more "App-like"
 plutil -replace CFBundleName -string "Jarvix" "$APP_PATH/Contents/Info.plist"
 plutil -replace CFBundleDisplayName -string "Jarvix" "$APP_PATH/Contents/Info.plist"
 plutil -replace CFBundleIdentifier -string "com.jarvix.launcher" "$APP_PATH/Contents/Info.plist"
 plutil -replace CFBundleIconFile -string "$ICON_NAME" "$APP_PATH/Contents/Info.plist"
 plutil -replace CFBundleIconName -string "$ICON_NAME" "$APP_PATH/Contents/Info.plist"
 
-# Force macOS to re-index the app and its icon
 touch "$APP_PATH"
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP_PATH"
 xattr -rd com.apple.quarantine "$APP_PATH" 2>/dev/null || true
-ok "Jarvix.app created in ~/Applications (Native AppleScript wrapper)"
+ok "Jarvix.app created in ~/Applications"
 
 # ── Done ───────────────────────────────────────────────────────────────────────
 echo ""
 echo "  ╔════════════════════════════════════════════════╗"
 echo "  ║  ✅  Jarvix is installed!                      ║"
 echo "  ║                                                ║"
-echo "  ║  How to open:                                  ║"
-echo "  ║  Press ⌘ Space, type Jarvix, press Enter       ║"
+echo "  ║  Opening Jarvix for you now...                 ║"
 echo "  ╚════════════════════════════════════════════════╝"
 echo ""
+
+/usr/bin/open "$APP_PATH"
