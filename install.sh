@@ -186,7 +186,7 @@ trap cleanup SIGTERM SIGINT SIGHUP
 # Start server if needed
 if ! /usr/sbin/lsof -ti:3000 -sTCP:LISTEN >/dev/null 2>&1; then
   cd "$INSTALL_DIR"
-  nohup npm start >> "$INSTALL_DIR/logs/server.log" 2>&1 &
+  nohup npm start > /dev/null 2>&1 &
   disown || true
 fi
 
@@ -200,7 +200,7 @@ while true; do
     sleep 60
     if ! /usr/bin/curl -fs --max-time 3 http://localhost:3000 >/dev/null 2>&1; then
        cd "$INSTALL_DIR"
-       nohup npm start >> "$INSTALL_DIR/logs/server.log" 2>&1 &
+       nohup npm start > /dev/null 2>&1 &
        disown || true
     fi
   fi
@@ -216,8 +216,8 @@ chmod +x "$LAUNCHER_SCRIPT"
 rm -rf "$APP_PATH"
 osacompile -o "$APP_PATH" -e "do shell script \"$LAUNCHER_SCRIPT > /dev/null 2>&1 &\""
 
-# 3. Apply the icon and Info.plist settings to the new bundle
-mkdir -p "$APP_PATH/Contents/Resources"
+# 2. Convert the PNG icon to a real PNG then to ICNS
+ICON_NAME="JarvixIcon"
 REAL_PNG="/tmp/jarvix_icon_real.png"
 ICONSET_DIR="/tmp/Jarvix.iconset"
 mkdir -p "$ICONSET_DIR"
@@ -226,17 +226,18 @@ for size in 16 32 128 256 512; do
   sips -z $size $size "$REAL_PNG" --out "$ICONSET_DIR/icon_${size}x${size}.png" > /dev/null
   sips -z $((size * 2)) $((size * 2)) "$REAL_PNG" --out "$ICONSET_DIR/icon_${size}x${size}@2x.png" > /dev/null
 done
-iconutil -c icns "$ICONSET_DIR" -o "$APP_PATH/Contents/Resources/applet.icns" 2>/dev/null || true
+iconutil -c icns "$ICONSET_DIR" -o "$APP_PATH/Contents/Resources/${ICON_NAME}.icns" 2>/dev/null || true
 
 # Update Info.plist to be more "App-like"
 plutil -replace CFBundleName -string "Jarvix" "$APP_PATH/Contents/Info.plist"
 plutil -replace CFBundleDisplayName -string "Jarvix" "$APP_PATH/Contents/Info.plist"
 plutil -replace CFBundleIdentifier -string "com.jarvix.launcher" "$APP_PATH/Contents/Info.plist"
-plutil -replace CFBundleIconFile -string "applet" "$APP_PATH/Contents/Info.plist"
-plutil -replace CFBundleIconName -string "applet" "$APP_PATH/Contents/Info.plist"
+plutil -replace CFBundleIconFile -string "$ICON_NAME" "$APP_PATH/Contents/Info.plist"
+plutil -replace CFBundleIconName -string "$ICON_NAME" "$APP_PATH/Contents/Info.plist"
 
-# Refresh the icon cache
+# Force macOS to re-index the app and its icon
 touch "$APP_PATH"
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP_PATH"
 xattr -rd com.apple.quarantine "$APP_PATH" 2>/dev/null || true
 ok "Jarvix.app created in ~/Applications (Native AppleScript wrapper)"
 
