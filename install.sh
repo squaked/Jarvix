@@ -288,23 +288,15 @@ xattr -rd com.apple.quarantine "$APP_PATH" 2>/dev/null || true
 ok "Jarvix.app created in ~/Applications"
 
 
-# ── 10. Open in browser ───────────────────────────────────────────────────────
-step "Starting Jarvix..."
-# Wait for the server to actually respond before opening the browser.
-# The LaunchAgent was loaded in step 7 and starts asynchronously.
-for i in $(seq 1 60); do
-  curl -fs --max-time 1 http://localhost:3000 >/dev/null 2>&1 && break
-  sleep 1
-done
-open "http://localhost:3000" 2>/dev/null || true
-
 # ── Done ───────────────────────────────────────────────────────────────────────
 echo ""
 echo "  ╔════════════════════════════════════════════════╗"
-echo "  ║  ✅  Jarvix is installed and running!          ║"
+echo "  ║  ✅  Jarvix is installed!                      ║"
 echo "  ║                                                ║"
-echo "  ║  Open:    http://localhost:3000                ║"
-echo "  ║  App:     ~/Applications/Jarvix.app            ║"
+echo "  ║  How to open:                                  ║"
+echo "  ║  Press ⌘ Space, type Jarvix, press Enter       ║"
+echo "  ║  — or click Jarvix in ~/Applications           ║"
+echo "  ║                                                ║"
 echo "  ║  Updates: automatic every 6h + in-app button   ║"
 echo "  ╚════════════════════════════════════════════════╝"
 echo ""
