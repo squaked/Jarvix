@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { getJarvixInstallDir } from "@/lib/jarvix-install-dir";
 import { execFile, spawn } from "node:child_process";
