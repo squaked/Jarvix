@@ -59,9 +59,10 @@ export async function POST(): Promise<NextResponse<CheckResult>> {
     const alreadyRunning = fs.existsSync(lockDir);
 
     if (!alreadyRunning && fs.existsSync(updateScript)) {
+      const logFile = fs.openSync(path.join(installDir, "logs", "update.log"), "a");
       const child = spawn(updateScript, [], {
         detached: true,
-        stdio: "ignore",
+        stdio: ["ignore", logFile, logFile],
         cwd: installDir,
         env: { ...process.env, JARVIX_INSTALL_DIR: installDir },
       });

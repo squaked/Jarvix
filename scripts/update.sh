@@ -54,7 +54,7 @@ if ! git fetch origin 2>&1; then
 fi
 
 BEFORE="$(git rev-parse HEAD)"
-REMOTE="$(git rev-parse '@{u}' 2>/dev/null || echo "$BEFORE")"
+REMOTE="$(git rev-parse origin/main 2>/dev/null || echo "$BEFORE")"
 
 if [ "$BEFORE" = "$REMOTE" ]; then
   log "Already up to date."

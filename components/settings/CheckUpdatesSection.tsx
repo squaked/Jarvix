@@ -7,7 +7,7 @@ import {
   clearJarvixUpdateFastPollWindow,
   startJarvixUpdateFastPollWindow,
 } from "@/lib/jarvix-update-poll";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Status =
   | "idle"
@@ -55,9 +55,6 @@ export function CheckUpdatesSection() {
       } else {
         // building / alreadyRunning — keep fast polling until `.update-ready` appears
         setStatus("building");
-        // Safety: fall back to idle after 20 min so the user isn’t stuck
-        // with a disabled button if the build fails silently.
-        setTimeout(() => setStatus((s) => (s === "building" ? "idle" : s)), 20 * 60 * 1000);
       }
     } catch (e) {
       clearJarvixUpdateFastPollWindow();
@@ -65,6 +62,29 @@ export function CheckUpdatesSection() {
       setStatus("error");
     }
   };
+
+  useEffect(() => {
+    if (status !== "building") return;
+
+    const interval = setInterval(() => {
+      fetch("/api/update-status", { cache: "no-store" })
+        .then((r) => r.json())
+        .then((data: { ready?: boolean; building?: boolean }) => {
+          if (data.ready) {
+            kickJarvixUpdateBannerStatus();
+            setStatus("ready");
+          } else if (!data.building) {
+            // Lock disappeared but no ready marker — build must have failed.
+            clearJarvixUpdateFastPollWindow();
+            setErrorMsg("Build failed. Check logs/update.log for details.");
+            setStatus("error");
+          }
+        })
+        .catch(() => {});
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [status]);
 
   return (
     <Card className="p-6 sm:p-8">

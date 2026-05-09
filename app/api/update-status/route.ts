@@ -71,12 +71,15 @@ export async function GET() {
     const installDir = getJarvixInstallDir();
     const markerPath = getMarkerPath(installDir);
 
+    const lockPath = path.join(installDir, ".update.lock");
+    const building = fs.existsSync(lockPath);
+
     if (!fs.existsSync(markerPath)) {
-      return NextResponse.json({ ready: false });
+      return NextResponse.json({ ready: false, building });
     }
 
     const ready = isUpdateGenuinelyPending(markerPath);
-    return NextResponse.json({ ready });
+    return NextResponse.json({ ready, building });
   } catch {
     // On any error, assume no update to avoid phantom banners.
     return NextResponse.json({ ready: false });
