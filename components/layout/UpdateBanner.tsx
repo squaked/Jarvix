@@ -36,6 +36,7 @@ export function UpdateBanner() {
   const [phase, setPhase] = useState<Phase>("idle");
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
+  const mountedRef = useRef(true);
 
   const checkForUpdate = useCallback(async () => {
     // Mid-restart: wait for restart flow — don't flicker banner state.
@@ -49,10 +50,12 @@ export function UpdateBanner() {
     try {
       const res = await fetch("/api/update-status", {
         cache: "no-store",
-        signal: fetchTimeoutSignal(3000),
+        signal: fetchTimeoutSignal(5000),
       });
+      if (!mountedRef.current) return;
       if (!res.ok) return;
       const data = (await res.json()) as { ready?: boolean };
+      if (!mountedRef.current) return;
 
       if (data.ready === true) {
         clearJarvixUpdateFastPollWindow();
@@ -71,6 +74,7 @@ export function UpdateBanner() {
   }, []);
 
   useEffect(() => {
+    mountedRef.current = true;
     let intervalId: ReturnType<typeof setInterval> | undefined;
 
     const reinstallTimer = () => {
@@ -106,6 +110,7 @@ export function UpdateBanner() {
     document.addEventListener("visibilitychange", onVisible);
 
     return () => {
+      mountedRef.current = false;
       if (intervalId !== undefined) clearInterval(intervalId);
       window.removeEventListener(JARVIX_UPDATE_BUILD_STARTED_EVENT, bump);
       window.removeEventListener(JARVIX_UPDATE_BUILD_IDLE_EVENT, reinstallTimer);
@@ -139,6 +144,7 @@ export function UpdateBanner() {
     // grace window and surface "ready" again so the user can retry.
     const startedAt = Date.now();
     const poll = () => {
+      if (!mountedRef.current) return;
       fetch("/api/update-status", {
         cache: "no-store",
         signal: fetchTimeoutSignal(2000),
@@ -159,7 +165,7 @@ export function UpdateBanner() {
         })
         .catch(() => {
           if (Date.now() - startedAt > RESTART_GRACE_MS) {
-            setPhase("ready");
+            if (mountedRef.current) setPhase("ready");
             return;
           }
           setTimeout(poll, RESTART_POLL_MS);
@@ -174,11 +180,12 @@ export function UpdateBanner() {
     <AnimatePresence>
       {visible && (
         <motion.div
+          key="update-banner"
           initial={{ opacity: 0, y: 16, scale: 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 8, scale: 0.97 }}
           transition={{ duration: 0.2, ease: "easeOut" }}
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-3 text-sm shadow-lg"
+          className="fixed bottom-6 right-6 z-[9999] flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-3 text-sm shadow-lg"
           style={{ boxShadow: "var(--warm-shadow), 0 4px 24px rgba(0,0,0,0.12)" }}
           role="status"
         >

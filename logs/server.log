@@ -1,0 +1,13 @@
+
+> jarvix@0.1.0 start
+> next start
+
+ ⚠ You are using a non-standard "NODE_ENV" value in your environment. This creates inconsistencies in the project and is strongly advised against. Read more: https://nextjs.org/docs/messages/non-standard-node-env
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3000
+
+ ✓ Starting...
+Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id
+    at setupFsCheck (/Users/Shared/Jarvix/node_modules/next/dist/server/lib/router-utils/filesystem.js:151:19)
+    at async initialize (/Users/Shared/Jarvix/node_modules/next/dist/server/lib/router-server.js:64:23)
+    at async Server.<anonymous> (/Users/Shared/Jarvix/node_modules/next/dist/server/lib/start-server.js:249:36)

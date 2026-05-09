@@ -43,7 +43,7 @@ export async function POST() {
   if (!relauncherSpawned) {
     // Re-create the marker so the banner stays visible for a manual retry.
     try {
-      fs.writeFileSync(markerPath, "");
+      fs.writeFileSync(markerPath, "pending\n");
     } catch { /* best effort */ }
     return NextResponse.json(
       { error: "Restart script not found or failed to launch. Please restart Jarvix manually." },

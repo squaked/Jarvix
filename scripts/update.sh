@@ -91,5 +91,6 @@ fi
 log "Build complete."
 
 # Signal to the running server that an update is ready.
-touch "$INSTALL_DIR/.update-ready"
+# Write the NEW rev so the status endpoint can reconcile without git.
+git rev-parse HEAD > "$INSTALL_DIR/.update-ready"
 log "Update ready — banner will appear in the Jarvix UI."

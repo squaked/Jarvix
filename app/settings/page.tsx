@@ -51,12 +51,8 @@ export default function SettingsPage() {
 
       <div className="mx-auto max-w-2xl px-6 py-10 flex flex-col gap-10">
         <Section title="AI">
-          <div className="rounded-2xl border border-border bg-surface-2/50 p-3 text-xs text-muted mb-2">
-            <strong>Note:</strong> Your API keys and settings are stored locally on your device in <code className="font-mono bg-surface px-1 py-0.5 rounded border border-border">~/.jarvix-data/settings.json</code>.
-          </div>
           <ProviderForm onSaved={notifySaved} />
           <TtsSettingsCard onSaved={notifySaved} />
-          <GroqUsageSection />
         </Section>
 
         <Section title="Personal">
@@ -71,8 +67,12 @@ export default function SettingsPage() {
 
         <Section title="App">
           <ThemeCard />
-          <CheckUpdatesSection />
           <QuitSection />
+        </Section>
+
+        <Section title="Technical">
+          <GroqUsageSection />
+          <CheckUpdatesSection />
         </Section>
       </div>
 

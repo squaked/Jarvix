@@ -57,29 +57,6 @@ export function TtsSettingsCard({ onSaved }: Props) {
         >
           Read aloud
         </h2>
-        <p className="mt-0.5 text-sm text-muted">
-          Uses Groq&apos;s {" "}
-          <a
-            className="text-accent underline-offset-4 hover:underline"
-            href="https://console.groq.com/docs/text-to-speech/orpheus"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Orpheus text-to-speech
-          </a>{" "}
-          with your Groq API key — same billing as chat. Each segment is limited
-          to 200 characters; long replies play in sequence. Orpheus may require a
-          one-time{" "}
-          <a
-            className="text-accent underline-offset-4 hover:underline"
-            href={ORPHEUS_ENGLISH_TERMS_PLAYGROUND_URL}
-            target="_blank"
-            rel="noreferrer"
-          >
-            terms acceptance
-          </a>{" "}
-          in Groq Console for org admins.
-        </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">

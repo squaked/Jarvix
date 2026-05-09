@@ -1,75 +1,84 @@
 import { NextResponse } from "next/server";
 import { getJarvixInstallDir } from "@/lib/jarvix-install-dir";
-import { execFile } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { promisify } from "node:util";
-
-const execFileAsync = promisify(execFile);
 
 function getMarkerPath(installDir: string): string {
   return path.join(installDir, ".update-ready");
 }
 
-function normalizeGitRev(s: string | undefined): string {
+/**
+ * Normalize a git revision to a 7-char lowercase prefix.
+ * Returns "" for missing / "unknown" values.
+ */
+function normalizeRev(s: string | undefined): string {
   const t = (s ?? "").trim().toLowerCase();
   if (!t || t === "unknown") return "";
   return t.length >= 7 ? t.slice(0, 7) : t;
 }
 
-async function readCheckoutHeadRev(installDir: string): Promise<string | null> {
-  if (!fs.existsSync(path.join(installDir, ".git"))) return null;
+/**
+ * Reads the target revision from the `.update-ready` marker file.
+ * The marker may contain just a rev hash (written by update.sh) or be empty
+ * (legacy / manual touch). Returns "" if the file is empty or unreadable.
+ */
+function readMarkerTargetRev(markerPath: string): string {
   try {
-    const { stdout } = await execFileAsync("git", [
-      "-C",
-      installDir,
-      "rev-parse",
-      "HEAD",
-    ]);
-    const normalized = normalizeGitRev(stdout);
-    return normalized || null;
+    const content = fs.readFileSync(markerPath, "utf8").trim();
+    return normalizeRev(content);
   } catch {
-    return null;
+    return "";
   }
 }
 
 /**
- * Removes a stale `.update-ready` marker when this process was built from the
- * same git revision as the checkout on disk (user already restarted or updated
- * manually). While a staged update is pending, disk HEAD differs from this
- * process's inlined NEXT_PUBLIC_JARVIX_GIT_REV.
+ * Check whether `.update-ready` represents a genuinely pending update.
+ *
+ * The marker contains the NEW revision that was built. We compare it against
+ * this process's build-time rev (`NEXT_PUBLIC_JARVIX_GIT_REV`).
+ *
+ * - If the marker's target rev matches the running rev → the user already
+ *   restarted (or updated manually). The marker is stale — delete it.
+ * - If they differ (or either is unknown) → the update is genuinely pending.
+ *
+ * This approach requires NO git commands at poll time — just a file read and
+ * a string comparison — which makes it fast and impossible to break.
  */
-async function reconcileStaleMarker(
-  installDir: string,
-  markerPath: string,
-): Promise<boolean> {
-  const runningRev = normalizeGitRev(process.env.NEXT_PUBLIC_JARVIX_GIT_REV);
-  if (!runningRev) return fs.existsSync(markerPath);
+function isUpdateGenuinelyPending(markerPath: string): boolean {
+  const markerRev = readMarkerTargetRev(markerPath);
+  const runningRev = normalizeRev(process.env.NEXT_PUBLIC_JARVIX_GIT_REV);
 
-  const headRev = await readCheckoutHeadRev(installDir);
-  if (!headRev || runningRev !== headRev) {
-    return true;
+  // If the marker is empty (legacy / manual touch) or we don't know the
+  // running rev, we can't reconcile — assume the update is genuine.
+  if (!markerRev || !runningRev) return true;
+
+  // If they match, the update was already applied → clean up the stale marker.
+  if (markerRev === runningRev) {
+    try {
+      fs.rmSync(markerPath, { force: true });
+    } catch {
+      /* ignore */
+    }
+    return false;
   }
 
-  try {
-    fs.rmSync(markerPath, { force: true });
-  } catch {
-    /* ignore — still treat as no longer pending */
-  }
-  return false;
+  // Revs differ → update is genuinely pending.
+  return true;
 }
 
 export async function GET() {
   try {
     const installDir = getJarvixInstallDir();
     const markerPath = getMarkerPath(installDir);
+
     if (!fs.existsSync(markerPath)) {
       return NextResponse.json({ ready: false });
     }
 
-    const ready = await reconcileStaleMarker(installDir, markerPath);
+    const ready = isUpdateGenuinelyPending(markerPath);
     return NextResponse.json({ ready });
   } catch {
+    // On any error, assume no update to avoid phantom banners.
     return NextResponse.json({ ready: false });
   }
 }
