@@ -1,6 +1,7 @@
 "use client";
 
 import { Card } from "@/components/ui/Card";
+import { jarvixDisplayVersion } from "@/lib/jarvix-version-display";
 import { useState } from "react";
 
 type Status =
@@ -22,6 +23,7 @@ type CheckResponse = {
 export function CheckUpdatesSection() {
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const displayVersion = jarvixDisplayVersion();
 
   const check = async () => {
     setStatus("checking");
@@ -56,7 +58,15 @@ export function CheckUpdatesSection() {
           >
             Updates
           </h2>
-          <p className="mt-0.5 text-sm text-muted">
+          {displayVersion ? (
+            <p
+              className="mt-0.5 font-mono text-[11px] uppercase tracking-wide text-muted/90"
+              title="Package version and git commit for this build"
+            >
+              {displayVersion}
+            </p>
+          ) : null}
+          <p className="mt-1 text-sm text-muted">
             {status === "idle" && "Jarvix checks automatically every 6 hours."}
             {status === "checking" && "Checking for updates…"}
             {status === "upToDate" && "Already up to date."}
