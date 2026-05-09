@@ -69,6 +69,7 @@ export function MessageBubble({
           }}
         >
           {imageDataUrl && (
+            /* eslint-disable-next-line @next/next/no-img-element */
             <img
               src={imageDataUrl}
               alt="Attachment"

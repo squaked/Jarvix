@@ -1,13 +1,14 @@
 "use client";
 
+import Image from "next/image";
 import { Card } from "@/components/ui/Card";
 
 export function AboutCard() {
   return (
     <Card className="p-6 space-y-4">
       <div className="flex items-center gap-4">
-        <div className="h-12 w-12 rounded-2xl overflow-hidden shadow-soft border border-border/50">
-          <img src="/icon.png" alt="Jarvix Icon" className="w-full h-full object-cover" />
+        <div className="h-12 w-12 rounded-2xl overflow-hidden shadow-soft border border-border/50 relative">
+          <Image src="/icon.png" alt="Jarvix Icon" fill className="object-cover" />
         </div>
         <div>
           <h2
