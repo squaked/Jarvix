@@ -39,3 +39,6 @@ next-env.d.ts
 
 # macOS EventKit helper (run npm run build:macos-helper)
 scripts/macos/JarvixEventKitHelper/JarvixEventKitHelper.app/
+
+# Logs
+/logs/
