@@ -171,8 +171,9 @@ mkdir -p "$APP_PATH/Contents/MacOS"
 
 cat > "$APP_PATH/Contents/MacOS/Jarvix" << 'APPSCRIPT'
 #!/bin/bash
-# Jarvix.app — opens the browser and stays alive while the server is reachable.
+# Jarvix.app — opens the browser and stays alive as long as the user wants.
 # Quitting the app (Cmd+Q or Dock → Quit) stops the server.
+# The app NEVER exits on its own — it stays in the Dock permanently.
 
 INSTALL_DIR="__JARVIX_INSTALL_DIR_PLACEHOLDER__"  # substituted below by sed
 
@@ -181,6 +182,8 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin"
 
 # Export install dir so the child Next.js server can find the update marker.
 export JARVIX_INSTALL_DIR="$INSTALL_DIR"
+
+mkdir -p "$INSTALL_DIR/logs"
 
 # ── Quit handler ───────────────────────────────────────────────────────
 # macOS sends SIGTERM when the user quits via Dock or Cmd+Q.
@@ -192,18 +195,21 @@ cleanup() {
 }
 trap cleanup SIGTERM SIGINT SIGHUP
 
-# ── Start server if port 3000 is not already bound ────────────────────
-# We deliberately do NOT `wait` on the PID below — an in-app update
-# restart briefly drops the server and we want the .app to ride it out.
-if ! /usr/sbin/lsof -ti:3000 -sTCP:LISTEN >/dev/null 2>&1; then
-  mkdir -p "$INSTALL_DIR/logs"
+# ── Helper: start the server if it isn't already running ──────────────
+start_server() {
+  if /usr/sbin/lsof -ti:3000 -sTCP:LISTEN >/dev/null 2>&1; then
+    return 0  # already running
+  fi
   cd "$INSTALL_DIR"
   nohup npm start >> "$INSTALL_DIR/logs/server.log" 2>&1 &
   disown || true
-fi
+}
+
+# ── Start server if port 3000 is not already bound ────────────────────
+start_server
 
 # Wait for the server to respond over HTTP (covers slow cold-starts).
-for i in $(seq 1 60); do
+for i in $(seq 1 90); do
   /usr/bin/curl -fs --max-time 1 http://localhost:3000 >/dev/null 2>&1 && break
   sleep 1
 done
@@ -211,17 +217,35 @@ done
 # ── Open the browser ──────────────────────────────────────────────────
 /usr/bin/open "http://localhost:3000"
 
-# ── Stay alive while the server is reachable ──────────────────────────
-# Tolerate a 30-second outage so an in-app update restart doesn't kill us.
-# SIGTERM (from Dock quit) is caught by the trap above.
+# ── Stay alive permanently ────────────────────────────────────────────
+# This loop NEVER exits on its own. The app stays in the Dock.
+# If the server goes down for >60 seconds, we try to restart it
+# (up to 3 consecutive attempts before backing off).
+# The ONLY way this loop ends is via SIGTERM/SIGINT (user quit).
 DOWN_SECONDS=0
+RESTART_ATTEMPTS=0
+MAX_RESTART_ATTEMPTS=3
 while true; do
   if /usr/bin/curl -fs --max-time 3 http://localhost:3000 >/dev/null 2>&1; then
     DOWN_SECONDS=0
+    RESTART_ATTEMPTS=0
   else
     DOWN_SECONDS=$((DOWN_SECONDS + 5))
-    if [ "$DOWN_SECONDS" -ge 30 ]; then
-      break
+
+    # Server has been unreachable for >60s — try to restart it.
+    if [ "$DOWN_SECONDS" -ge 60 ]; then
+      if [ "$RESTART_ATTEMPTS" -lt "$MAX_RESTART_ATTEMPTS" ]; then
+        RESTART_ATTEMPTS=$((RESTART_ATTEMPTS + 1))
+        echo "$(date): Server down for ${DOWN_SECONDS}s — restart attempt $RESTART_ATTEMPTS/$MAX_RESTART_ATTEMPTS" \
+          >> "$INSTALL_DIR/logs/launcher.log"
+        start_server
+        DOWN_SECONDS=0
+        sleep 10  # give the server time to cold-start
+        continue
+      fi
+      # Max attempts reached — back off and check every 30s, but keep running.
+      # If the user fixes the issue and restarts manually, we'll detect it.
+      sleep 25  # total ~30s with the sleep 5 below
     fi
   fi
   sleep 5
@@ -266,7 +290,12 @@ ok "Jarvix.app created in ~/Applications"
 
 # ── 10. Open in browser ───────────────────────────────────────────────────────
 step "Starting Jarvix..."
-sleep 4
+# Wait for the server to actually respond before opening the browser.
+# The LaunchAgent was loaded in step 7 and starts asynchronously.
+for i in $(seq 1 60); do
+  curl -fs --max-time 1 http://localhost:3000 >/dev/null 2>&1 && break
+  sleep 1
+done
 open "http://localhost:3000" 2>/dev/null || true
 
 # ── Done ───────────────────────────────────────────────────────────────────────
