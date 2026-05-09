@@ -6,7 +6,7 @@ import {
   ORPHEUS_ENGLISH_VOICES,
 } from "@/lib/tts-voices";
 import { ORPHEUS_ENGLISH_TERMS_PLAYGROUND_URL } from "@/lib/groq-user-error-message";
-import { playBundledOrFallbackTtsPreview } from "@/lib/play-tts-preview";
+import { useGroqTts } from "@/lib/use-groq-tts";
 import { useJarvixSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import type { TtsVoiceId } from "@/lib/types";
@@ -19,6 +19,7 @@ type Props = {
 export function TtsSettingsCard({ onSaved }: Props) {
   const { settings, saveSettings } = useJarvixSettings();
   const tts = settings.tts;
+  const { speak, stop } = useGroqTts();
   const [previewBusy, setPreviewBusy] = useState<TtsVoiceId | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
 
@@ -30,11 +31,17 @@ export function TtsSettingsCard({ onSaved }: Props) {
   const previewVoice = async (voiceId: TtsVoiceId) => {
     setPreviewError(null);
     setPreviewBusy(voiceId);
+    stop();
     try {
-      await playBundledOrFallbackTtsPreview(voiceId);
+      await speak({
+        messageId: "preview",
+        plainText: "Hi! This is what I sound like. I'm ready to help you.",
+        voice: voiceId,
+        settings,
+      });
     } catch {
       setPreviewError(
-        "Speech preview unavailable — allow audio / try another browser.",
+        "Preview failed. Check your API key or connection.",
       );
     } finally {
       setPreviewBusy(null);
@@ -111,22 +118,6 @@ export function TtsSettingsCard({ onSaved }: Props) {
 
       <div className="space-y-2">
         <p className="text-sm font-medium text-text">Voice</p>
-        <p className="text-xs text-muted">
-          Previews prefer bundled WAVs in{" "}
-          <code className="rounded bg-border/40 px-1 py-0.5 font-mono text-[10px]">
-            public/tts-previews/
-          </code>
-          ({`run `}
-          <code className="rounded bg-border/40 px-1 py-0.5 font-mono text-[10px]">
-            npm run generate:tts-previews
-          </code>
-          {` with `}
-          <code className="rounded bg-border/40 px-1 py-0.5 font-mono text-[10px]">
-            GROQ_API_KEY
-          </code>
-          {`). If files are missing, previews use the browser voice instead. Chat `}
-          read-aloud still uses Groq with your saved key.
-        </p>
         {previewError ? (
           <p
             className="rounded-xl border border-red-500/30 bg-red-500/[0.07] px-3 py-2 text-sm text-red-600 dark:text-red-400"

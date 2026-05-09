@@ -75,7 +75,8 @@ export function InputBar({
   const resize = useCallback(() => {
     const el = taRef.current;
     if (!el) return;
-    el.style.height = "0px";
+    el.style.minHeight = '44px';
+    el.style.height = 'auto';
     el.style.height = `${Math.min(el.scrollHeight, 144)}px`;
   }, []);
 
@@ -329,7 +330,12 @@ export function InputBar({
             )}
           />
 
-          <div className="flex items-end p-2">
+          <div className="flex items-end p-2 gap-2">
+            {!focused && !value && (
+               <div className="hidden sm:flex items-center justify-center pointer-events-none h-9 px-2 text-[10px] font-medium text-muted/60 border border-border/40 rounded-lg">
+                 ⌘K
+               </div>
+            )}
             <button
               type="button"
               disabled={!canStop && !canSend}

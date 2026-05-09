@@ -19,7 +19,7 @@ osascript -e 'tell application "Jarvix" to quit' 2>/dev/null || true
 sleep 1
 
 # 3. Belt-and-braces: kill anything still bound to port 3000.
-SERVER_PID="$(/usr/sbin/lsof -ti:3000 2>/dev/null | head -1 || true)"
+SERVER_PID="$(/usr/sbin/lsof -ti:3000 -sTCP:LISTEN 2>/dev/null | head -1 || true)"
 if [ -n "$SERVER_PID" ]; then
   kill "$SERVER_PID" 2>/dev/null || true
   sleep 1

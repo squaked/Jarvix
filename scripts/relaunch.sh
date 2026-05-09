@@ -18,12 +18,12 @@ echo "$(date): relaunch requested" >> "$LOG_DIR/relaunch.log"
 
 # Wait up to 10s for the previous server to release port 3000.
 for _ in $(seq 1 20); do
-  /usr/sbin/lsof -ti:3000 >/dev/null 2>&1 || break
+  /usr/sbin/lsof -ti:3000 -sTCP:LISTEN >/dev/null 2>&1 || break
   sleep 0.5
 done
 
 # If something is still bound, force-kill it so the new server can start.
-PID="$(/usr/sbin/lsof -ti:3000 2>/dev/null | head -1 || true)"
+PID="$(/usr/sbin/lsof -ti:3000 -sTCP:LISTEN 2>/dev/null | head -1 || true)"
 if [ -n "$PID" ]; then
   kill -TERM "$PID" 2>/dev/null || true
   sleep 1
@@ -36,4 +36,20 @@ echo "$(date): starting fresh server" >> "$LOG_DIR/relaunch.log"
 # Detach fully so this script can exit and macOS doesn't keep the
 # old session group around.
 nohup npm start >> "$LOG_DIR/server.log" 2>&1 &
+SERVER_PID=$!
 disown || true
+
+# Wait up to 30s for the server to actually respond.
+for i in $(seq 1 30); do
+  sleep 1
+  if /usr/bin/curl -fs --max-time 1 http://localhost:3000 >/dev/null 2>&1; then
+    echo "$(date): server is responding (pid=$SERVER_PID)" >> "$LOG_DIR/relaunch.log"
+    exit 0
+  fi
+  # If the process died, don't keep waiting.
+  if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+    echo "$(date): server process died — check server.log" >> "$LOG_DIR/relaunch.log"
+    exit 1
+  fi
+done
+echo "$(date): server did not respond within 30s" >> "$LOG_DIR/relaunch.log"

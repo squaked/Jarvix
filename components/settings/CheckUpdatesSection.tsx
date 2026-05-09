@@ -55,6 +55,9 @@ export function CheckUpdatesSection() {
       } else {
         // building / alreadyRunning — keep fast polling until `.update-ready` appears
         setStatus("building");
+        // Safety: fall back to idle after 20 min so the user isn’t stuck
+        // with a disabled button if the build fails silently.
+        setTimeout(() => setStatus((s) => (s === "building" ? "idle" : s)), 20 * 60 * 1000);
       }
     } catch (e) {
       clearJarvixUpdateFastPollWindow();

@@ -24,11 +24,10 @@ async function readCheckoutHeadRev(installDir: string): Promise<string | null> {
       "-C",
       installDir,
       "rev-parse",
-      "--short",
       "HEAD",
     ]);
-    const h = stdout.trim().toLowerCase();
-    return h.length >= 7 ? h.slice(0, 7) : h || null;
+    const normalized = normalizeGitRev(stdout);
+    return normalized || null;
   } catch {
     return null;
   }

@@ -61,9 +61,10 @@ export function MessageBubble({
         className="flex justify-end"
       >
         <div
-          className="max-w-[75%] rounded-2xl rounded-tr-sm px-4 py-3 text-[15px] leading-relaxed text-text border border-border"
+          className="max-w-[75%] rounded-2xl rounded-tr-sm px-4 py-3 text-[15px] leading-relaxed"
           style={{
-            background: "var(--surface-2)",
+            background: "var(--accent)",
+            color: "white",
             boxShadow: "var(--warm-shadow)",
           }}
         >
@@ -95,9 +96,9 @@ export function MessageBubble({
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={{
-              p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
-              ul: ({ children }) => <ul className="mb-3 list-disc pl-5 last:mb-0">{children}</ul>,
-              ol: ({ children }) => <ol className="mb-3 list-decimal pl-5 last:mb-0">{children}</ol>,
+              p: ({ children }) => <p className="mb-3 font-display text-[16.5px] last:mb-0">{children}</p>,
+              ul: ({ children }) => <ul className="mb-3 list-disc pl-5 font-display text-[16.5px] last:mb-0">{children}</ul>,
+              ol: ({ children }) => <ol className="mb-3 list-decimal pl-5 font-display text-[16.5px] last:mb-0">{children}</ol>,
               li: ({ children }) => <li className="mb-1">{children}</li>,
               strong: ({ children }) => <strong className="font-semibold text-text">{children}</strong>,
               em: ({ children }) => <em className="italic opacity-90">{children}</em>,
@@ -113,17 +114,32 @@ export function MessageBubble({
                 </a>
               ),
               code({ className, children, ...props }: { className?: string; children?: React.ReactNode }) {
+                const match = /language-(\w+)/.exec(className || "");
+                const lang = match ? match[1] : "";
                 const isBlock = /language-/.test(className ?? "");
+                const textContent = String(children).replace(/\n$/, "");
                 return isBlock ? (
-                  <code
-                    className="block w-full overflow-x-auto rounded-xl border border-border bg-surface-2 p-4 font-mono text-sm text-text my-3"
-                    {...props}
-                  >
-                    {children}
-                  </code>
+                  <div className="my-3 overflow-hidden rounded-xl border border-border bg-surface-2">
+                    <div className="flex items-center justify-between bg-surface/50 px-4 py-1.5 border-b border-border text-xs text-muted">
+                      <span className="font-mono uppercase">{lang || "text"}</span>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(textContent)}
+                        className="hover:text-text transition-colors flex items-center gap-1"
+                        title="Copy code"
+                      >
+                        <CopyGlyph /> Copy
+                      </button>
+                    </div>
+                    <code
+                      className="block w-full overflow-x-auto p-4 font-mono text-[13px] text-text"
+                      {...props}
+                    >
+                      {children}
+                    </code>
+                  </div>
                 ) : (
                   <code
-                    className="rounded-lg border border-border bg-surface-2 px-1.5 py-0.5 font-mono text-sm"
+                    className="rounded-lg border border-border bg-surface-2 px-1.5 py-0.5 font-mono text-[13px]"
                     style={{ color: "var(--accent)" }}
                     {...props}
                   >
@@ -131,7 +147,7 @@ export function MessageBubble({
                   </code>
                 );
               },
-              pre: ({ children }) => <pre className="mb-3 last:mb-0">{children}</pre>,
+              pre: ({ children }) => <pre className="m-0">{children}</pre>,
               h1: ({ children }) => (
                 <h1
                   className="mb-4 font-display text-xl font-medium text-text border-b border-border pb-2"

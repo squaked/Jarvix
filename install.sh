@@ -174,7 +174,7 @@ cat > "$APP_PATH/Contents/MacOS/Jarvix" << 'APPSCRIPT'
 # Jarvix.app — opens the browser and stays alive while the server is reachable.
 # Quitting the app (Cmd+Q or Dock → Quit) stops the server.
 
-INSTALL_DIR="JARVIX_INSTALL_DIR"  # substituted below by sed
+INSTALL_DIR="__JARVIX_INSTALL_DIR_PLACEHOLDER__"  # substituted below by sed
 
 # Full explicit PATH so system tools and Homebrew node are always found.
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin"
@@ -186,7 +186,7 @@ export JARVIX_INSTALL_DIR="$INSTALL_DIR"
 # macOS sends SIGTERM when the user quits via Dock or Cmd+Q.
 cleanup() {
   local pid
-  pid="$(/usr/sbin/lsof -ti:3000 2>/dev/null | head -1)"
+  pid="$(/usr/sbin/lsof -ti:3000 -sTCP:LISTEN 2>/dev/null | head -1)"
   [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
   exit 0
 }
@@ -195,7 +195,7 @@ trap cleanup SIGTERM SIGINT SIGHUP
 # ── Start server if port 3000 is not already bound ────────────────────
 # We deliberately do NOT `wait` on the PID below — an in-app update
 # restart briefly drops the server and we want the .app to ride it out.
-if ! /usr/sbin/lsof -ti:3000 >/dev/null 2>&1; then
+if ! /usr/sbin/lsof -ti:3000 -sTCP:LISTEN >/dev/null 2>&1; then
   mkdir -p "$INSTALL_DIR/logs"
   cd "$INSTALL_DIR"
   nohup npm start >> "$INSTALL_DIR/logs/server.log" 2>&1 &
@@ -229,7 +229,7 @@ done
 APPSCRIPT
 
 # Bake the install path into the script (avoids variable-expansion issues in heredoc).
-sed -i '' "s|JARVIX_INSTALL_DIR|${INSTALL_DIR}|g" "$APP_PATH/Contents/MacOS/Jarvix"
+sed -i '' "s|__JARVIX_INSTALL_DIR_PLACEHOLDER__|${INSTALL_DIR}|g" "$APP_PATH/Contents/MacOS/Jarvix"
 chmod +x "$APP_PATH/Contents/MacOS/Jarvix"
 
 cat > "$APP_PATH/Contents/Info.plist" << INFOPLIST

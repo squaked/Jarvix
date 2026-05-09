@@ -18,6 +18,7 @@ import type { Chat, Message } from "@/lib/types";
 import type { GroqTranscriptionUsage } from "@/lib/transcribe-api-types";
 import { useRouter } from "next/navigation";
 import { startTransition, useCallback, useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
 
 type StreamChunk =
   | { type: "text"; delta?: string }
@@ -380,7 +381,7 @@ export default function ChatDetailPage({
         onMobileOpenChange={setHistoryOpen}
         onChatsChange={refreshChats}
       />
-
+      
       <div className="sticky top-0 z-20 shrink-0 glass border-b border-border/50">
         <AppHeader
           compact

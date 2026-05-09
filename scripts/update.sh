@@ -2,7 +2,7 @@
 # scripts/update.sh
 #
 # Triggered by:
-#   • the com.jarvix.updater LaunchAgent (every 30 minutes), and
+#   • the com.jarvix.updater LaunchAgent (every 6 hours), and
 #   • the in-app "Check for updates" button (POST /api/check-updates).
 #
 # Pulls latest code and rebuilds only when there are actual changes.
@@ -20,8 +20,18 @@ log() { echo "$LOG_PREFIX: $*"; }
 # Avoid two updates running at the same time (LaunchAgent + manual check).
 # We use a directory as a lock because it's atomic and works without flock.
 LOCK_DIR="$INSTALL_DIR/.update.lock"
+if [ -d "$LOCK_DIR" ]; then
+  LOCK_AGE=$(( $(date +%s) - $(stat -f %m "$LOCK_DIR" 2>/dev/null || echo 0) ))
+  if [ "$LOCK_AGE" -gt 1800 ]; then
+    log "Breaking stale lock (age: ${LOCK_AGE}s)."
+    rmdir "$LOCK_DIR" 2>/dev/null || rm -rf "$LOCK_DIR"
+  else
+    log "Another update is already in progress (age: ${LOCK_AGE}s) — skipping."
+    exit 0
+  fi
+fi
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
-  log "Another update is already in progress — skipping."
+  log "Could not acquire lock — skipping."
   exit 0
 fi
 trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
@@ -53,6 +63,9 @@ fi
 
 log "Updates found — pulling and rebuilding..."
 
+# Save the current HEAD so we can roll back if the build fails.
+ROLLBACK_REV="$BEFORE"
+
 # Refuse to clobber local edits — surface this clearly in the log.
 if ! git pull --ff-only 2>&1; then
   log "git pull --ff-only failed (local changes or non-FF history). Aborting."
@@ -60,12 +73,21 @@ if ! git pull --ff-only 2>&1; then
 fi
 
 # Only reinstall deps if package-lock.json or package.json changed.
-if git diff --name-only "$BEFORE" HEAD | grep -qE '^(package\.json|package-lock\.json)$'; then
+if git diff --name-only "$ROLLBACK_REV" HEAD | grep -qE '^(package\.json|package-lock\.json)$'; then
   log "Dependencies changed — running npm install..."
-  npm install --silent
+  if ! npm install --silent; then
+    log "npm install failed — rolling back to $ROLLBACK_REV."
+    git reset --hard "$ROLLBACK_REV"
+    exit 1
+  fi
 fi
 
-npm run build --silent
+if ! npm run build --silent; then
+  log "Build failed — rolling back to $ROLLBACK_REV."
+  git reset --hard "$ROLLBACK_REV"
+  npm run build --silent 2>/dev/null || true   # best-effort rebuild old version
+  exit 1
+fi
 log "Build complete."
 
 # Signal to the running server that an update is ready.

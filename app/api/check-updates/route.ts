@@ -46,7 +46,7 @@ export async function POST(): Promise<NextResponse<CheckResult>> {
     ]);
     const { stdout: remote } = await exec(
       "git",
-      ["-C", installDir, "rev-parse", "@{u}"],
+      ["-C", installDir, "rev-parse", "origin/main"],
       { timeout: 5_000 },
     );
 

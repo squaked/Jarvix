@@ -9,6 +9,10 @@ import { MessageBubble } from "./MessageBubble";
 import type { ToolCallCardProps } from "./ToolCallCard";
 import { ToolCallCard } from "./ToolCallCard";
 import { StreamingCursor } from "./StreamingCursor";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { useState } from "react";
 
 type Props = {
   messages: Message[];
@@ -29,7 +33,7 @@ const EMPTY_SUGGESTIONS = [
   "What's on my calendar today?",
   "What's the weather like?",
   "Search the web for the latest AI news",
-  "Help me draft a quick reply to a friend",
+  "What else can you do?",
 ] as const;
 
 export function MessageList({
@@ -44,11 +48,20 @@ export function MessageList({
   onSpeakAssistant,
   onStopSpeak,
 }: Props) {
+  const [isScrolledUp, setIsScrolledUp] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, streamTools, streamAssistantText, streamingAssistant]);
+    if (!isScrolledUp) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+  }, [messages, streamTools.length, streamAssistantText, streamingAssistant, isScrolledUp]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    const isAtBottom = el.scrollHeight - el.scrollTop <= el.clientHeight + 100;
+    setIsScrolledUp(!isAtBottom);
+  };
 
   const showStreamBlock =
     streamTools.length > 0 ||
@@ -101,8 +114,9 @@ export function MessageList({
   }
 
   return (
-    <div className="scrollbar-thin flex-1 overflow-y-auto px-4 py-8">
-      <div className="mx-auto flex max-w-2xl flex-col gap-5">
+    <div className="scrollbar-thin flex-1 overflow-y-auto px-4 py-8 relative" onScroll={handleScroll}>
+      <div className="mx-auto flex max-w-2xl flex-col gap-5 relative">
+        <ErrorBoundary>
         {messages.map((m, i) => (
           <MessageBubble
             key={m.id}
@@ -128,6 +142,7 @@ export function MessageList({
             onStopSpeak={onStopSpeak}
           />
         ))}
+        </ErrorBoundary>
 
         {showStreamBlock ? (
           <div className="flex flex-col gap-2">
@@ -151,8 +166,32 @@ export function MessageList({
                   className="max-w-[82%] rounded-2xl rounded-tl-sm px-5 py-4 bg-surface border border-border"
                   style={{ boxShadow: "var(--card-shadow)" }}
                 >
-                  <div className="text-[15px] leading-relaxed text-text whitespace-pre-wrap">
-                    {streamAssistantText}
+                  <div className="prose-chat text-[15px] leading-relaxed text-text">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        p: ({ children }) => <p className="mb-3 font-display text-[16.5px] last:mb-0">{children}</p>,
+                        ul: ({ children }) => <ul className="mb-3 list-disc pl-5 font-display text-[16.5px] last:mb-0">{children}</ul>,
+                        ol: ({ children }) => <ol className="mb-3 list-decimal pl-5 font-display text-[16.5px] last:mb-0">{children}</ol>,
+                        li: ({ children }) => <li className="mb-1">{children}</li>,
+                        strong: ({ children }) => <strong className="font-semibold text-text">{children}</strong>,
+                        em: ({ children }) => <em className="italic opacity-90">{children}</em>,
+                        a: ({ children, href }) => (
+                          <a href={href} className="underline underline-offset-2 transition-opacity hover:opacity-70" style={{ color: "var(--accent)" }} target="_blank" rel="noreferrer">{children}</a>
+                        ),
+                        code({ className, children, ...props }: { className?: string; children?: React.ReactNode }) {
+                          const isBlock = /language-/.test(className ?? "");
+                          return isBlock ? (
+                            <code className="block w-full overflow-x-auto rounded-xl border border-border bg-surface-2 p-4 font-mono text-sm text-text my-3" {...props}>{children}</code>
+                          ) : (
+                            <code className="rounded-lg border border-border bg-surface-2 px-1.5 py-0.5 font-mono text-[13px]" style={{ color: "var(--accent)" }} {...props}>{children}</code>
+                          );
+                        },
+                        pre: ({ children }) => <pre className="m-0">{children}</pre>,
+                      }}
+                    >
+                      {streamAssistantText}
+                    </ReactMarkdown>
                     {streamingAssistant ? <StreamingCursor /> : null}
                   </div>
                 </div>
@@ -163,6 +202,20 @@ export function MessageList({
 
         <div ref={bottomRef} />
       </div>
+      {isScrolledUp && (
+        <button
+          onClick={() => {
+            setIsScrolledUp(false);
+            bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+          }}
+          className="fixed bottom-24 right-8 z-50 flex h-10 w-10 items-center justify-center rounded-full bg-surface border border-border text-muted hover:text-text transition-all shadow-card hover:bg-surface-2"
+          aria-label="Scroll to bottom"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }

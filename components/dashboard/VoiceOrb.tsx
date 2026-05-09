@@ -207,7 +207,7 @@ export function VoiceOrb({
               <ListeningPulseDot />
               <span
                 className={cn(
-                  "font-semibold uppercase tracking-wide text-red-400",
+                  "font-semibold uppercase tracking-wide text-accent",
                   compact ? "text-xs" : "text-sm",
                 )}
               >

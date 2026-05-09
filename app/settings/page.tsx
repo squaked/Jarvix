@@ -51,6 +51,9 @@ export default function SettingsPage() {
 
       <div className="mx-auto max-w-2xl px-6 py-10 flex flex-col gap-10">
         <Section title="AI">
+          <div className="rounded-2xl border border-border bg-surface-2/50 p-3 text-xs text-muted mb-2">
+            <strong>Note:</strong> Your API keys and settings are stored locally on your device in <code className="font-mono bg-surface px-1 py-0.5 rounded border border-border">~/.jarvix-data/settings.json</code>.
+          </div>
           <ProviderForm onSaved={notifySaved} />
           <TtsSettingsCard onSaved={notifySaved} />
           <GroqUsageSection />
@@ -107,8 +110,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 function BackIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-      <polyline points="9 22 9 12 15 12 15 22" />
+      <path d="M19 12H5M12 5l-7 7 7 7" />
     </svg>
   );
 }

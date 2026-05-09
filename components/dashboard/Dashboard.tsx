@@ -4,11 +4,12 @@ import { AppHeader } from "@/components/layout/AppHeader";
 import { TtsHeaderToggle } from "@/components/layout/TtsHeaderToggle";
 import { VoiceOrb } from "@/components/dashboard/VoiceOrb";
 import { ListeningPulseDot } from "@/components/voice/ListeningIndicator";
-import { createChat } from "@/lib/storage";
+import { createChat, getChats } from "@/lib/storage";
+import type { Chat } from "@/lib/types";
 import type { RecorderState } from "@/lib/use-audio-recorder";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CalendarWidget } from "./CalendarWidget";
 import { GreetingBlock } from "./GreetingBlock";
 import { DashboardBottomSection } from "./DashboardBottomSection";
@@ -19,9 +20,14 @@ export function Dashboard() {
   const [inputValue, setInputValue] = useState("");
   const [focused, setFocused] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [lastChat, setLastChat] = useState<Chat | null>(null);
   const [orbRecorderState, setOrbRecorderState] =
     useState<RecorderState>("idle");
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    getChats().then(chats => setLastChat(chats[0] || null)).catch(() => {});
+  }, []);
 
   const orbListening = orbRecorderState === "recording";
   const orbTranscribing = orbRecorderState === "transcribing";
@@ -164,6 +170,21 @@ export function Dashboard() {
                 </button>
               </div>
             </div>
+
+            {lastChat && (
+              <div className="flex animate-fade-up stagger-5 -mt-3">
+                <button
+                  type="button"
+                  onClick={() => router.push(`/chat/${lastChat.id}`)}
+                  className="group flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-1.5 text-xs text-muted hover:text-text hover:border-accent/40 hover:bg-surface-2 transition-all shadow-soft"
+                >
+                  Continue: <span className="text-text font-medium truncate max-w-[200px]">{lastChat.title || "Recent conversation"}</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="group-hover:translate-x-0.5 transition-transform">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

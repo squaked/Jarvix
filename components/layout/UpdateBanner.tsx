@@ -122,7 +122,13 @@ export function UpdateBanner() {
   const handleRestart = useCallback(async () => {
     setPhase("restarting");
     try {
-      await fetch("/api/restart", { method: "POST" });
+      const res = await fetch("/api/restart", { method: "POST" });
+      // If the relauncher failed to spawn, the server stays alive and returns
+      // a 500 with an error message. Show "ready" again so the user can retry.
+      if (!res.ok) {
+        setPhase("ready");
+        return;
+      }
     } catch {
       // expected — the server closes the connection while restarting
     }
@@ -142,8 +148,10 @@ export function UpdateBanner() {
           const body = (await r.json().catch(() => ({}))) as {
             ready?: boolean;
           };
-          // Marker cleared (or stale-reconciled) — refresh so the banner drops.
-          if (body.ready !== true) {
+          // Only reload once enough time has passed that the OLD server has
+          // definitely exited (it waits 2s before process.exit). This avoids
+          // reloading against the stale server that already cleared the marker.
+          if (body.ready !== true && Date.now() - startedAt > 5000) {
             window.location.reload();
             return;
           }

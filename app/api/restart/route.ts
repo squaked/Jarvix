@@ -20,6 +20,7 @@ export async function POST() {
   // process to release port 3000, then starts a fresh `npm start`.
   // Without this, the LaunchAgent (KeepAlive=false) and the Jarvix.app
   // launcher would both treat the exit as a final shutdown.
+  let relauncherSpawned = false;
   try {
     if (fs.existsSync(relaunchScript)) {
       const child = spawn(relaunchScript, [], {
@@ -32,15 +33,27 @@ export async function POST() {
         },
       });
       child.unref();
+      relauncherSpawned = true;
     }
   } catch {
-    // If we can't spawn the relauncher we still exit; the user can
-    // re-open Jarvix.app from the Dock and the LaunchAgent will start it.
+    // If we can't spawn the relauncher, do NOT exit — the user would lose
+    // the server entirely (KeepAlive=false in LaunchAgent).
   }
 
-  // Give the response a beat to flush, then exit so the new server can
-  // bind port 3000.
-  setTimeout(() => process.exit(0), 500);
+  if (!relauncherSpawned) {
+    // Re-create the marker so the banner stays visible for a manual retry.
+    try {
+      fs.writeFileSync(markerPath, "");
+    } catch { /* best effort */ }
+    return NextResponse.json(
+      { error: "Restart script not found or failed to launch. Please restart Jarvix manually." },
+      { status: 500 },
+    );
+  }
+
+  // Give in-flight requests time to flush, then exit so the new server
+  // can bind port 3000.
+  setTimeout(() => process.exit(0), 2000);
 
   return NextResponse.json({ restarting: true });
 }
