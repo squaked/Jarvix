@@ -2,7 +2,8 @@
 
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import Image from "next/image";
+import { type ReactNode, useEffect, useState } from "react";
 
 const appHeaderIconButtonBase =
   "flex items-center justify-center rounded-xl border border-border bg-surface text-muted hover:text-text hover:border-accent/40 transition-all";
@@ -25,6 +26,24 @@ type Props = {
 
 export function AppHeader({ endBeforeSettings, className, compact }: Props) {
   const iconBtn = compact ? appHeaderIconButtonClassCompact : appHeaderIconButtonClass;
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const dateStr = now.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+  
+  const timeStr = now.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
 
   return (
     <header
@@ -36,16 +55,16 @@ export function AppHeader({ endBeforeSettings, className, compact }: Props) {
     >
       <Link
         href="/"
-        className={cn(
-          "font-display font-semibold tracking-tight",
-          compact ? "text-base" : "text-xl",
-        )}
-        style={{
-          fontVariationSettings: compact ? '"opsz" 20' : '"opsz" 24',
-          color: "var(--accent)",
-        }}
+        className="flex flex-col items-start gap-0.5 group"
       >
-        Jarvix
+        <div className="relative h-8 w-8 rounded-xl overflow-hidden border border-border/50 shadow-soft transition-transform group-hover:scale-105">
+          <Image src="/icon.png" alt="Jarvix" fill className="object-cover" />
+        </div>
+        {!compact && (
+          <span className="text-[10px] font-medium text-muted/80 whitespace-nowrap uppercase tracking-wider">
+            {dateStr} · {timeStr}
+          </span>
+        )}
       </Link>
 
       <div className={cn("flex items-center", compact ? "gap-1.5" : "gap-2")}>

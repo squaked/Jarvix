@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useJarvixSettings } from "@/lib/settings";
 import { fetchCalendarWidgetData } from "@/lib/widgets-calendar-client";
 import { useEffect, useState } from "react";
@@ -23,22 +22,6 @@ function getGreeting(hour: number): string {
   return "Good night";
 }
 
-function formatDate(now: Date): string {
-  return now.toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-}
-
-function formatTime(now: Date): string {
-  return now.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-}
-
 function formatEventTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -49,16 +32,9 @@ function formatEventTime(iso: string): string {
 
 export function GreetingBlock() {
   const { settings, bootstrapped } = useJarvixSettings();
-  const [now, setNow] = useState(() => new Date());
   const [snap, setSnap] = useState<Snapshot>({});
 
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 30_000);
-    return () => clearInterval(id);
-  }, []);
-
   // Lightweight calendar + weather peek for the at-a-glance line.
-  // Failures are silent — we just don't render the preview.
   useEffect(() => {
     if (!bootstrapped) return;
     let cancelled = false;
@@ -112,7 +88,7 @@ export function GreetingBlock() {
     };
   }, [bootstrapped, settings.weatherLocation]);
 
-  const hour = now.getHours();
+  const hour = new Date().getHours();
   const greeting = getGreeting(hour);
   const name = settings.agent?.displayName?.trim();
 
@@ -134,14 +110,8 @@ export function GreetingBlock() {
 
   return (
     <div className="flex flex-col items-center gap-1 text-center">
-      <div className="mb-4 h-14 w-14 rounded-2xl overflow-hidden shadow-warm border border-border/40 animate-fade-up relative">
-        <Image src="/icon.png" alt="Jarvix" fill className="object-cover" priority />
-      </div>
-      <p className="text-sm font-medium text-muted animate-fade-up stagger-1">
-        {formatDate(now)} · {formatTime(now)}
-      </p>
       <h1
-        className="font-display text-[2.6rem] leading-tight font-medium text-text animate-fade-up stagger-2"
+        className="font-display text-[2.8rem] leading-tight font-medium text-text animate-fade-up"
         style={{ fontOpticalSizing: "auto", fontVariationSettings: '"opsz" 48' }}
       >
         {greeting}
@@ -152,7 +122,7 @@ export function GreetingBlock() {
         ) : null}
       </h1>
       {previewBits.length > 0 && (
-        <p className="mt-1 text-sm text-muted/80 animate-fade-up stagger-3">
+        <p className="mt-1 text-sm text-muted/80 animate-fade-up stagger-1">
           {previewBits.join(" · ")}
         </p>
       )}
