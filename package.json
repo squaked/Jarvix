@@ -11,8 +11,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "build:macos-helper": "bash scripts/macos/JarvixEventKitHelper/build.sh",
-    "generate:tts-previews": "node scripts/generate-tts-previews.mjs"
+    "build:macos-helper": "bash scripts/macos/JarvixEventKitHelper/build.sh"
   },
   "dependencies": {
     "@ai-sdk/groq": "^3.0.38",

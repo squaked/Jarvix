@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     const model = getLanguageModel(pseudo);
     await generateText({
       model,
-      prompt: "Respond with exactly: OK",
+      prompt: "Respond exactly: OK",
       maxOutputTokens: 16,
       temperature: 0,
     });
