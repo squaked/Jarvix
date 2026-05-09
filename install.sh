@@ -30,28 +30,23 @@ echo "  ╚═══════════════════════
 if ! command -v brew &>/dev/null; then
   step "Installing Homebrew (this may ask for your password)..."
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-  # Add brew to PATH for Apple Silicon and Intel
   eval "$(/opt/homebrew/bin/brew shellenv)" 2>/dev/null \
     || eval "$(/usr/local/bin/brew shellenv)" 2>/dev/null \
-    || fail "Homebrew installed but could not be found — open a new terminal and re-run this script."
+    || fail "Homebrew installed but could not be found."
   ok "Homebrew installed"
 else
   ok "Homebrew found"
 fi
 
-# ── 2. Git / Xcode Command Line Tools ────────────────────────────────────────
+# ── 2. Git / Xcode Tools ──────────────────────────────────────────────────────
 if ! command -v git &>/dev/null; then
-  step "Installing Git (Xcode Command Line Tools)..."
+  step "Installing Git..."
   xcode-select --install 2>/dev/null || true
-  # Wait for the installation to complete (up to 3 minutes)
-  for i in $(seq 1 36); do
-    sleep 5
-    command -v git &>/dev/null && break
-  done
-  command -v git &>/dev/null || fail "Git is required. Install Xcode Command Line Tools, then re-run this script."
+  for i in $(seq 1 36); do sleep 5; command -v git &>/dev/null && break; done
+  command -v git &>/dev/null || fail "Git is required."
   ok "Git installed"
 else
-  ok "Git found ($(git --version | awk '{print $3}'))"
+  ok "Git found"
 fi
 
 # ── 3. Node.js ─────────────────────────────────────────────────────────────────
@@ -60,7 +55,7 @@ if ! command -v node &>/dev/null; then
   brew install node
   ok "Node.js installed"
 else
-  ok "Node.js found ($(node --version))"
+  ok "Node.js found"
 fi
 
 NODE_BIN="$(command -v node)"
@@ -89,7 +84,7 @@ ok "Build complete"
 mkdir -p "$LOG_DIR"
 
 # ── 7. Server LaunchAgent ──────────────────────────────────────────────────────
-step "Setting up background service (auto-start on login)..."
+step "Setting up background service..."
 mkdir -p "$HOME/Library/LaunchAgents"
 
 cat > "$SERVER_PLIST" << PLIST
@@ -118,7 +113,6 @@ cat > "$SERVER_PLIST" << PLIST
   <true/>
   <key>KeepAlive</key>
   <false/>
-
   <key>StandardOutPath</key>
   <string>${LOG_DIR}/server.log</string>
   <key>StandardErrorPath</key>
@@ -131,7 +125,7 @@ launchctl unload "$SERVER_PLIST" 2>/dev/null || true
 launchctl load "$SERVER_PLIST"
 ok "Background service installed"
 
-# ── 8. Auto-updater LaunchAgent (every 6 hours) ───────────────────────────────
+# ── 8. Auto-updater LaunchAgent ───────────────────────────────────────────────
 cat > "$UPDATER_PLIST" << PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -162,31 +156,25 @@ PLIST
 
 launchctl unload "$UPDATER_PLIST" 2>/dev/null || true
 launchctl load "$UPDATER_PLIST"
-ok "Auto-updater installed (runs every 6 hours)"
+ok "Auto-updater installed"
 
 # ── 9. Jarvix.app in ~/Applications ───────────────────────────────────────────
-step "Creating Jarvix app launcher..."
+step "Creating Jarvix app launcher (using native AppleScript wrapper)..."
 mkdir -p "$HOME/Applications"
-mkdir -p "$APP_PATH/Contents/MacOS"
 
-cat > "$APP_PATH/Contents/MacOS/Jarvix" << 'APPSCRIPT'
+# 1. Create the bash launcher script
+LAUNCHER_SCRIPT="$INSTALL_DIR/scripts/macos/launcher.sh"
+mkdir -p "$(dirname "$LAUNCHER_SCRIPT")"
+
+cat > "$LAUNCHER_SCRIPT" << 'APPSCRIPT'
 #!/bin/bash
-# Jarvix.app — opens the browser immediately and stays alive as long as the user wants.
-# Quitting the app (Cmd+Q or Dock → Quit) stops the server.
-# The app NEVER exits on its own — it stays in the Dock permanently.
+# This script is called by the Jarvix.app wrapper.
 
-INSTALL_DIR="__JARVIX_INSTALL_DIR_PLACEHOLDER__"  # substituted below by sed
-
-# Full explicit PATH so system tools and Homebrew node are always found.
+INSTALL_DIR="__JARVIX_INSTALL_DIR_PLACEHOLDER__"
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin"
-
-# Export install dir so the child Next.js server can find the update marker.
 export JARVIX_INSTALL_DIR="$INSTALL_DIR"
 
-mkdir -p "$INSTALL_DIR/logs"
-
-# ── Quit handler ───────────────────────────────────────────────────────
-# macOS sends SIGTERM when the user quits via Dock or Cmd+Q.
+# Cleanup on quit
 cleanup() {
   local pid
   pid="$(/usr/sbin/lsof -ti:3000 -sTCP:LISTEN 2>/dev/null | head -1)"
@@ -195,94 +183,62 @@ cleanup() {
 }
 trap cleanup SIGTERM SIGINT SIGHUP
 
-# ── Helper: start the server if it isn't already running ──────────────
-start_server() {
-  if /usr/sbin/lsof -ti:3000 -sTCP:LISTEN >/dev/null 2>&1; then
-    return 0  # already running
-  fi
+# Start server if needed
+if ! /usr/sbin/lsof -ti:3000 -sTCP:LISTEN >/dev/null 2>&1; then
   cd "$INSTALL_DIR"
   nohup npm start >> "$INSTALL_DIR/logs/server.log" 2>&1 &
   disown || true
-}
+fi
 
-# ── Start server if port 3000 is not already bound ────────────────────
-start_server
-
-# ── Open the browser immediately ─────────────────────────────────────
-# Don't block — open right away. The browser will show a "connection
-# refused" page briefly if the server is still cold-starting; that's fine.
-# We do NOT re-open later: doing so would cause the Dock icon to bounce
-# every time the server restarts (e.g. after an in-app update).
+# Open browser immediately
 /usr/bin/open "http://localhost:3000"
 
-# ── Stay alive permanently ────────────────────────────────────────────
-# This loop NEVER exits on its own. The app stays in the Dock.
-# If the server goes down for >60 seconds, we try to restart it
-# (up to 3 consecutive attempts before backing off).
-# The ONLY way this loop ends is via SIGTERM/SIGINT (user quit).
-DOWN_SECONDS=0
-RESTART_ATTEMPTS=0
-MAX_RESTART_ATTEMPTS=3
+# Stay alive to monitor server
 while true; do
-  if /usr/bin/curl -fs --max-time 3 http://localhost:3000 >/dev/null 2>&1; then
-    DOWN_SECONDS=0
-    RESTART_ATTEMPTS=0
-  else
-    DOWN_SECONDS=$((DOWN_SECONDS + 5))
-
-    # Server has been unreachable for >60s — try to restart it.
-    if [ "$DOWN_SECONDS" -ge 60 ]; then
-      if [ "$RESTART_ATTEMPTS" -lt "$MAX_RESTART_ATTEMPTS" ]; then
-        RESTART_ATTEMPTS=$((RESTART_ATTEMPTS + 1))
-        echo "$(date): Server down for ${DOWN_SECONDS}s — restart attempt $RESTART_ATTEMPTS/$MAX_RESTART_ATTEMPTS" \
-          >> "$INSTALL_DIR/logs/launcher.log"
-        start_server
-        DOWN_SECONDS=0
-        sleep 10  # give the server time to cold-start
-        continue
-      fi
-      # Max attempts reached — back off and check every 30s, but keep running.
-      # If the user fixes the issue and restarts manually, we'll detect it.
-      sleep 25  # total ~30s with the sleep 5 below
+  if ! /usr/bin/curl -fs --max-time 3 http://localhost:3000 >/dev/null 2>&1; then
+    # Try restart after 60s down
+    sleep 60
+    if ! /usr/bin/curl -fs --max-time 3 http://localhost:3000 >/dev/null 2>&1; then
+       cd "$INSTALL_DIR"
+       nohup npm start >> "$INSTALL_DIR/logs/server.log" 2>&1 &
+       disown || true
     fi
   fi
-  sleep 5
+  sleep 10
 done
 APPSCRIPT
 
-# Bake the install path into the script (avoids variable-expansion issues in heredoc).
-sed -i '' "s|__JARVIX_INSTALL_DIR_PLACEHOLDER__|${INSTALL_DIR}|g" "$APP_PATH/Contents/MacOS/Jarvix"
-chmod +x "$APP_PATH/Contents/MacOS/Jarvix"
+sed -i '' "s|__JARVIX_INSTALL_DIR_PLACEHOLDER__|${INSTALL_DIR}|g" "$LAUNCHER_SCRIPT"
+chmod +x "$LAUNCHER_SCRIPT"
 
-# ── Copy icon into the app bundle ─────────────────────────────────────────────
+# 2. Use osacompile to create a real .app that doesn't bounce
+# This signals "finished launching" immediately.
+rm -rf "$APP_PATH"
+osacompile -o "$APP_PATH" -e "do shell script \"$LAUNCHER_SCRIPT > /dev/null 2>&1 &\""
+
+# 3. Apply the icon and Info.plist settings to the new bundle
 mkdir -p "$APP_PATH/Contents/Resources"
-
-# Convert the PNG icon to a real PNG (it may be stored as JPEG) then to ICNS
 REAL_PNG="/tmp/jarvix_icon_real.png"
 ICONSET_DIR="/tmp/Jarvix.iconset"
 mkdir -p "$ICONSET_DIR"
 sips -s format png "$INSTALL_DIR/public/icon.png" --out "$REAL_PNG" > /dev/null 2>&1 || cp "$INSTALL_DIR/public/icon.png" "$REAL_PNG"
 for size in 16 32 128 256 512; do
   sips -z $size $size "$REAL_PNG" --out "$ICONSET_DIR/icon_${size}x${size}.png" > /dev/null
-  double=$((size * 2))
-  sips -z $double $double "$REAL_PNG" --out "$ICONSET_DIR/icon_${size}x${size}@2x.png" > /dev/null
+  sips -z $((size * 2)) $((size * 2)) "$REAL_PNG" --out "$ICONSET_DIR/icon_${size}x${size}@2x.png" > /dev/null
 done
-iconutil -c icns "$ICONSET_DIR" -o "$APP_PATH/Contents/Resources/AppIcon.icns" 2>/dev/null \
-  && ok "App icon installed" \
-  || ok "App icon skipped (iconutil not available)"
+iconutil -c icns "$ICONSET_DIR" -o "$APP_PATH/Contents/Resources/applet.icns" 2>/dev/null || true
 
+# Update Info.plist to be more "App-like"
 cat > "$APP_PATH/Contents/Info.plist" << INFOPLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleExecutable</key>
-  <string>Jarvix</string>
+  <key>CFBundleIconFile</key>
+  <string>applet</string>
   <key>CFBundleIdentifier</key>
   <string>com.jarvix.launcher</string>
   <key>CFBundleName</key>
-  <string>Jarvix</string>
-  <key>CFBundleDisplayName</key>
   <string>Jarvix</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
@@ -292,18 +248,12 @@ cat > "$APP_PATH/Contents/Info.plist" << INFOPLIST
   <string>11.0</string>
   <key>NSHighResolutionCapable</key>
   <true/>
-  <key>CFBundleIconFile</key>
-  <string>AppIcon</string>
-  <key>LSUIElement</key>
-  <false/>
 </dict>
 </plist>
 INFOPLIST
 
-# Clear quarantine flag so macOS doesn't block the app
 xattr -rd com.apple.quarantine "$APP_PATH" 2>/dev/null || true
-ok "Jarvix.app created in ~/Applications"
-
+ok "Jarvix.app created in ~/Applications (Native AppleScript wrapper)"
 
 # ── Done ───────────────────────────────────────────────────────────────────────
 echo ""
@@ -312,12 +262,5 @@ echo "  ║  ✅  Jarvix is installed!                      ║"
 echo "  ║                                                ║"
 echo "  ║  How to open:                                  ║"
 echo "  ║  Press ⌘ Space, type Jarvix, press Enter       ║"
-echo "  ║  — or click Jarvix in ~/Applications           ║"
-echo "  ║                                                ║"
-echo "  ║  Updates: automatic every 6h + in-app button   ║"
 echo "  ╚════════════════════════════════════════════════╝"
-echo ""
-echo "  Tip: drag Jarvix from ~/Applications to your Dock"
-echo "  for one-click access. When an update is ready, a"
-echo "  'Restart to apply' button will appear in the app."
 echo ""
