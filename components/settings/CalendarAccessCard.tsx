@@ -68,8 +68,7 @@ export function CalendarAccessCard() {
           Calendar
         </h2>
         <p className="mt-0.5 text-sm text-muted">
-          Lets Jarvix answer questions about your schedule. Calendar data stays
-          on your Mac.
+          Lets Jarvix answer questions about your schedule.
         </p>
       </div>
 
