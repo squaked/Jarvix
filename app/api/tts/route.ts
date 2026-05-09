@@ -4,6 +4,7 @@ import {
 } from "@/lib/settings-credentials";
 import { mergeProfileRecords, mergeSettingsPartial } from "@/lib/settings-merge";
 import { readSettingsFile } from "@/lib/settings-file-store";
+import { formatGroqApiErrorBodyForUser } from "@/lib/groq-user-error-message";
 import type { Settings, TtsVoiceId } from "@/lib/types";
 import { chunkTextForOrpheus } from "@/lib/tts-chunk";
 import {
@@ -101,10 +102,11 @@ export async function POST(req: Request) {
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    return NextResponse.json(
-      { error: errText || `Groq TTS failed (${res.status})` },
-      { status: 502 },
-    );
+    const error =
+      errText.trim() !== ""
+        ? formatGroqApiErrorBodyForUser(errText)
+        : `Groq TTS failed (HTTP ${res.status})`;
+    return NextResponse.json({ error }, { status: 502 });
   }
 
   const buf = Buffer.from(await res.arrayBuffer());

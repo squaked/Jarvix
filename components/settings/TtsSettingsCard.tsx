@@ -6,6 +6,7 @@ import {
   ORPHEUS_ENGLISH_VOICES,
   TTS_VOICE_SAMPLE,
 } from "@/lib/tts-voices";
+import { ORPHEUS_ENGLISH_TERMS_PLAYGROUND_URL } from "@/lib/groq-user-error-message";
 import { useJarvixSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import type { TtsVoiceId } from "@/lib/types";
@@ -91,6 +92,19 @@ export function TtsSettingsCard({ onSaved }: Props) {
           </a>{" "}
           with your Groq API key — same billing as chat. Each segment is limited
           to 200 characters; long replies play in sequence.
+        </p>
+        <p className="mt-2 text-xs text-muted">
+          If previews fail with terms or model acceptance, ask your Groq workspace
+          admin to{" "}
+          <a
+            className="text-accent underline-offset-4 hover:underline"
+            href={ORPHEUS_ENGLISH_TERMS_PLAYGROUND_URL}
+            target="_blank"
+            rel="noreferrer"
+          >
+            open Orpheus in Console once
+          </a>{" "}
+          and accept the model terms.
         </p>
       </div>
 
