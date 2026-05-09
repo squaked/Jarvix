@@ -1,7 +1,8 @@
 import { normalizeAgentPersonalization } from "./agent-personalization";
 import { JARVIX_GROQ_CHAT_MODEL, LEGACY_PROFILE_KEYS } from "./provider-options";
-import type { ProviderProfile, Settings } from "./types";
+import type { ProviderProfile, Settings, TtsSettings } from "./types";
 import { DEFAULT_JARVIX_SETTINGS, createDefaultProfiles } from "./settings-defaults";
+import { isTtsVoiceId } from "./tts-voices";
 
 /** Old flat settings shape (pre per-provider profiles). */
 type LegacyFlat = {
@@ -12,6 +13,7 @@ type LegacyFlat = {
   profiles?: Settings["profiles"] & Record<string, unknown>;
   agent?: unknown;
   weatherLocation?: unknown;
+  tts?: unknown;
 };
 
 function readProfileSlot(
@@ -67,13 +69,31 @@ export function mergeSettingsPartial(
       ? p.weatherLocation.trim()
       : DEFAULT_JARVIX_SETTINGS.weatherLocation;
 
+  const tts = normalizeTtsSettings(p.tts);
+
   return {
     provider: "groq",
     memoryEnabled,
     profiles,
     agent,
     weatherLocation,
+    tts,
   };
+}
+
+export function normalizeTtsSettings(raw: unknown): TtsSettings {
+  const base = DEFAULT_JARVIX_SETTINGS.tts;
+  if (!raw || typeof raw !== "object") return base;
+  const o = raw as Record<string, unknown>;
+  const enabled =
+    typeof o.enabled === "boolean" ? o.enabled : base.enabled;
+  const autoReadReplies =
+    typeof o.autoReadReplies === "boolean"
+      ? o.autoReadReplies
+      : base.autoReadReplies;
+  const voiceRaw = typeof o.voice === "string" ? o.voice : "";
+  const voice = isTtsVoiceId(voiceRaw) ? voiceRaw : base.voice;
+  return { enabled, autoReadReplies, voice };
 }
 
 function normalizeProfiles(p: LegacyFlat): Settings["profiles"] {

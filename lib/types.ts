@@ -25,6 +25,24 @@ export type AgentPersonalization = {
   voiceCustom: string;
 };
 
+/** Groq Orpheus English TTS voice IDs (canopylabs/orpheus-v1-english). */
+export type TtsVoiceId =
+  | "autumn"
+  | "diana"
+  | "hannah"
+  | "austin"
+  | "daniel"
+  | "troy";
+
+/** Read-aloud settings (Groq [text-to-speech / Orpheus](https://console.groq.com/docs/text-to-speech/orpheus)). */
+export type TtsSettings = {
+  /** Master switch: when off, nothing is spoken until the user turns it on. */
+  enabled: boolean;
+  /** After each assistant reply finishes, read it aloud automatically. */
+  autoReadReplies: boolean;
+  voice: TtsVoiceId;
+};
+
 export type Settings = {
   provider: Provider;
   memoryEnabled: boolean;
@@ -33,6 +51,7 @@ export type Settings = {
   agent: AgentPersonalization;
   /** City or place name for the dashboard weather widget (geocoded via Open-Meteo). */
   weatherLocation: string;
+  tts: TtsSettings;
 };
 
 export type Message = {

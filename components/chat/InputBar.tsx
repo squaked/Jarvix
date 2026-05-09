@@ -24,6 +24,8 @@ type Props = {
     content: string,
     attachment?: { base64: string; mimeType: string },
   ) => void;
+  /** Called when the user clicks the stop button while streaming. */
+  onStop?: () => void;
   disabled?: boolean;
   streaming?: boolean;
   /** Sit inside the dashboard / chat shell without floating dock chrome. */
@@ -32,6 +34,7 @@ type Props = {
 
 export function InputBar({
   onSend,
+  onStop,
   disabled = false,
   streaming = false,
   embedded = false,
@@ -116,6 +119,7 @@ export function InputBar({
 
   const busy = disabled || streaming;
   const canSend = Boolean(value.trim()) && !busy;
+  const canStop = streaming && Boolean(onStop);
 
   const submit = () => {
     const text = value.trim();
@@ -123,6 +127,14 @@ export function InputBar({
     setValue("");
     onSend(text);
     requestAnimationFrame(() => resize());
+  };
+
+  const handlePrimaryClick = () => {
+    if (canStop) {
+      onStop?.();
+      return;
+    }
+    submit();
   };
 
   const micScale = recording ? 1 + audioLevel * 0.3 : 1;
@@ -293,9 +305,11 @@ export function InputBar({
                 ? "Listening…"
                 : transcribing
                   ? "Transcribing…"
-                  : PLACEHOLDERS[placeholderIndex]
+                  : streaming
+                    ? "Type your next message…"
+                    : PLACEHOLDERS[placeholderIndex]
             }
-            disabled={busy}
+            disabled={disabled && !streaming}
             onChange={(e) => {
               setValue(e.target.value);
               resize();
@@ -305,35 +319,41 @@ export function InputBar({
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                submit();
+                if (canStop) onStop?.();
+                else submit();
               }
             }}
             className={cn(
               "flex-1 min-h-[44px] max-h-[144px] resize-none bg-transparent py-3 text-[15px] text-text outline-none placeholder:text-muted",
-              busy && "opacity-50",
+              disabled && !streaming && "opacity-50",
             )}
           />
 
           <div className="flex items-end p-2">
             <button
               type="button"
-              disabled={!canSend}
-              onClick={submit}
+              disabled={!canStop && !canSend}
+              onClick={handlePrimaryClick}
               className={cn(
                 "h-9 w-9 flex items-center justify-center rounded-xl transition-all duration-200 flex-shrink-0",
-                canSend ? "text-white" : "text-muted cursor-not-allowed opacity-40",
+                canSend || canStop
+                  ? "text-white"
+                  : "text-muted cursor-not-allowed opacity-40",
               )}
               style={
-                canSend
+                canSend || canStop
                   ? {
                       background: "var(--accent)",
                       boxShadow: "0 2px 12px var(--accent-glow)",
                     }
                   : { background: "var(--surface-2)" }
               }
-              aria-label="Send"
+              aria-label={canStop ? "Stop generating" : "Send"}
+              title={canStop ? "Stop generating" : "Send"}
             >
-              {streaming ? (
+              {canStop ? (
+                <StopSquare />
+              ) : streaming ? (
                 <motion.span
                   className="inline-block h-4 w-4 rounded-full border-2 border-white/30 border-t-white"
                   animate={{ rotate: 360 }}
@@ -351,6 +371,20 @@ export function InputBar({
         </div>
       </div>
     </div>
+  );
+}
+
+function StopSquare() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden
+    >
+      <rect x="6" y="6" width="12" height="12" rx="2" />
+    </svg>
   );
 }
 

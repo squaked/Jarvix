@@ -2,7 +2,11 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { normalizeAgentPersonalization } from "./agent-personalization";
 import type { Settings } from "./types";
-import { mergeProfileRecords, mergeSettingsPartial } from "./settings-merge";
+import {
+  mergeProfileRecords,
+  mergeSettingsPartial,
+  normalizeTtsSettings,
+} from "./settings-merge";
 import { getJarvixProjectDataDir } from "./project-data-dir";
 
 function settingsPath() {
@@ -47,6 +51,10 @@ export async function updateSettingsFile(
             ...patch.agent,
           })
         : prev.agent,
+    tts:
+      patch.tts != null && typeof patch.tts === "object"
+        ? normalizeTtsSettings({ ...prev.tts, ...patch.tts })
+        : prev.tts,
   };
   const next = mergeSettingsPartial(merged);
   return writeSettingsFile(next);

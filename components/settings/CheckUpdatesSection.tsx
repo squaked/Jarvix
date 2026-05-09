@@ -3,7 +3,21 @@
 import { Card } from "@/components/ui/Card";
 import { useState } from "react";
 
-type Status = "idle" | "checking" | "upToDate" | "building" | "error";
+type Status =
+  | "idle"
+  | "checking"
+  | "upToDate"
+  | "building"
+  | "ready"
+  | "error";
+
+type CheckResponse = {
+  upToDate?: boolean;
+  building?: boolean;
+  ready?: boolean;
+  alreadyRunning?: boolean;
+  error?: string;
+};
 
 export function CheckUpdatesSection() {
   const [status, setStatus] = useState<Status>("idle");
@@ -14,14 +28,16 @@ export function CheckUpdatesSection() {
     setErrorMsg("");
     try {
       const res = await fetch("/api/check-updates", { method: "POST" });
-      if (!res.ok) throw new Error(`Server error ${res.status}`);
-      const data = (await res.json()) as { upToDate?: boolean; error?: string };
-      if (data.error) throw new Error(data.error);
-      if (data.upToDate) {
+      const data = (await res.json().catch(() => ({}))) as CheckResponse;
+      if (!res.ok || data.error) {
+        throw new Error(data.error || `Server error ${res.status}`);
+      }
+      if (data.ready) {
+        setStatus("ready");
+      } else if (data.upToDate) {
         setStatus("upToDate");
-        setTimeout(() => setStatus("idle"), 4000);
+        setTimeout(() => setStatus((s) => (s === "upToDate" ? "idle" : s)), 4000);
       } else {
-        // update.sh is now running in the background; banner appears when ready
         setStatus("building");
       }
     } catch (e) {
@@ -41,10 +57,11 @@ export function CheckUpdatesSection() {
             Updates
           </h2>
           <p className="mt-0.5 text-sm text-muted">
-            {status === "idle" && "Jarvix checks automatically every 30 minutes."}
+            {status === "idle" && "Jarvix checks automatically every 6 hours."}
             {status === "checking" && "Checking for updates…"}
             {status === "upToDate" && "Already up to date."}
             {status === "building" && "Update found — building in the background. A banner will appear when ready."}
+            {status === "ready" && "Update built and waiting — use the banner to restart."}
             {status === "error" && (errorMsg || "Check failed.")}
           </p>
         </div>
@@ -65,6 +82,11 @@ export function CheckUpdatesSection() {
             <>
               <CheckIcon />
               Up to date
+            </>
+          ) : status === "ready" ? (
+            <>
+              <CheckIcon />
+              Update ready
             </>
           ) : status === "building" ? (
             <>

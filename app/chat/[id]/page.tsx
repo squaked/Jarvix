@@ -7,6 +7,9 @@ import {
   AppHeader,
   appHeaderIconButtonClassCompact,
 } from "@/components/layout/AppHeader";
+import { TtsHeaderToggle } from "@/components/layout/TtsHeaderToggle";
+import { markdownToPlainSpeech } from "@/lib/markdown-plain-speech";
+import { useGroqTts } from "@/lib/use-groq-tts";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { writeGroqQuotaToSession } from "@/lib/groq-quota-global";
 import { useJarvixSettings } from "@/lib/settings";
@@ -14,7 +17,7 @@ import { appendMessagesToChat, getChat, getChats } from "@/lib/storage";
 import type { Chat, Message } from "@/lib/types";
 import type { GroqTranscriptionUsage } from "@/lib/transcribe-api-types";
 import { useRouter } from "next/navigation";
-import { startTransition, useCallback, useEffect, useState } from "react";
+import { startTransition, useCallback, useEffect, useRef, useState } from "react";
 
 type StreamChunk =
   | { type: "text"; delta?: string }
@@ -39,6 +42,7 @@ export default function ChatDetailPage({
   const router = useRouter();
   const chatId = params.id;
   const { settings } = useJarvixSettings();
+  const { speak, stop, speakingId } = useGroqTts();
 
   const [chats, setChats] = useState<Chat[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -64,6 +68,7 @@ export default function ChatDetailPage({
   const [streamTools, setStreamTools] = useState<ToolTracker[]>([]);
   const [streamText, setStreamText] = useState("");
   const [streamingAssistant, setStreamingAssistant] = useState(false);
+  const streamAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -102,12 +107,199 @@ export default function ChatDetailPage({
     };
   }, [chatId, router]);
 
+  const runStream = useCallback(
+    async (baseline: Message[]) => {
+      setErrorBanner(null);
+      setStreamingAssistant(true);
+      setStreamText("");
+      setStreamTools([]);
+
+      let assistantAccumulator = "";
+      let streamRafId = 0;
+      let streamErrorSummary: string | null = null;
+      let aborted = false;
+
+      const ctrl = new AbortController();
+      streamAbortRef.current = ctrl;
+
+      const settingsPayload = settings;
+      let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: baseline, settings: settingsPayload }),
+          signal: ctrl.signal,
+        });
+
+        if (!res.ok) {
+          throw new Error("Something went wrong — check your API key in Settings.");
+        }
+
+        reader = res.body?.getReader();
+        if (!reader) throw new Error("Response stream unavailable.");
+
+        const decoder = new TextDecoder();
+        let backlog = "";
+
+        loop: while (true) {
+          const { done, value } = await reader.read();
+          backlog += decoder.decode(value ?? new Uint8Array(), { stream: true });
+          const segments = backlog.split("\n");
+          backlog = segments.pop() ?? "";
+
+          for (const rawLine of segments) {
+            const line = rawLine.trim();
+            if (!line) continue;
+
+            let chunk: StreamChunk;
+            try {
+              chunk = JSON.parse(line) as StreamChunk;
+            } catch {
+              continue;
+            }
+
+            if (chunk.type === "groq_quota") {
+              const u = chunk.usage;
+              if (u && typeof u === "object") {
+                writeGroqQuotaToSession(u);
+              }
+            }
+
+            if (chunk.type === "error") {
+              const m = chunk.message;
+              const text =
+                typeof m === "string"
+                  ? m
+                  : m != null && typeof m === "object"
+                    ? JSON.stringify(m)
+                    : "Something went wrong.";
+              const trimmed = text.trim() ? text : "Something went wrong.";
+              setErrorBanner(trimmed);
+              streamErrorSummary = trimmed;
+            }
+
+            if (chunk.type === "tool_call") {
+              const { tool, status, id: callId } = chunk;
+              if (status === "running") {
+                setStreamTools((prev) => [
+                  ...prev,
+                  { tool, status: "running", rowKey: callId ?? crypto.randomUUID() },
+                ]);
+              } else {
+                setStreamTools((prev) => {
+                  const next = [...prev];
+                  for (let i = next.length - 1; i >= 0; i--) {
+                    const row = next[i];
+                    if (!row || row.status !== "running") continue;
+                    const matchById = callId && row.rowKey === callId;
+                    const matchByTool = row.tool === tool;
+                    if (matchById || (!callId && matchByTool)) {
+                      next[i] = { ...row, status: "done", result: chunk.result };
+                      break;
+                    }
+                  }
+                  return next;
+                });
+              }
+            }
+
+            if (chunk.type === "text" && chunk.delta) {
+              assistantAccumulator += chunk.delta;
+              if (!streamRafId) {
+                streamRafId = window.requestAnimationFrame(() => {
+                  streamRafId = 0;
+                  setStreamText(assistantAccumulator);
+                });
+              }
+            }
+
+            if (chunk.type === "done") {
+              if (streamRafId) window.cancelAnimationFrame(streamRafId);
+              streamRafId = 0;
+              setStreamText(assistantAccumulator);
+              break loop;
+            }
+          }
+
+          if (done) break;
+        }
+
+        if (streamRafId) window.cancelAnimationFrame(streamRafId);
+        setStreamText(assistantAccumulator);
+      } catch (err) {
+        if ((err as { name?: string })?.name === "AbortError") {
+          aborted = true;
+        } else {
+          setErrorBanner(
+            err instanceof Error
+              ? err.message
+              : "Something interrupted the response.",
+          );
+        }
+      } finally {
+        try {
+          reader?.releaseLock();
+        } catch {
+          /* noop */
+        }
+        if (streamRafId) window.cancelAnimationFrame(streamRafId);
+        if (streamAbortRef.current === ctrl) streamAbortRef.current = null;
+      }
+
+      const trimmed = assistantAccumulator.trim();
+      const fallbackBody =
+        trimmed ||
+        (aborted
+          ? "(Stopped.)"
+          : streamErrorSummary
+            ? `Could not finish the reply (${streamErrorSummary}). If this persists, check your connection or try again — your API key may still be fine.`
+            : "(No response — check your API key in Settings.)");
+
+      const assistantMsg: Message = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: fallbackBody,
+      };
+
+      const finalMessages = [...baseline, assistantMsg];
+      setMessages(finalMessages);
+      setStreamingAssistant(false);
+      setStreamText("");
+      setStreamTools([]);
+
+      try {
+        await appendMessagesToChat(chatId, finalMessages);
+      } catch {
+        setErrorBanner("Couldn't save the reply.");
+      }
+      void refreshChats();
+
+      const payloadTts = settingsPayload.tts;
+      if (
+        payloadTts.enabled &&
+        payloadTts.autoReadReplies &&
+        !aborted
+      ) {
+        const plain = markdownToPlainSpeech(fallbackBody);
+        if (plain.length > 0) {
+          void speak({
+            messageId: assistantMsg.id,
+            plainText: plain,
+            voice: payloadTts.voice,
+          });
+        }
+      }
+    },
+    [chatId, refreshChats, settings, speak],
+  );
+
   const handleSend = async (
     text: string,
     attachment?: { base64: string; mimeType: string },
   ) => {
     if (streamingAssistant) return;
-    setErrorBanner(null);
+    stop();
 
     const body = text.trim();
     let userContent = body;
@@ -131,152 +323,52 @@ export default function ChatDetailPage({
     }
     void refreshChats();
 
-    setStreamingAssistant(true);
-    setStreamText("");
-    setStreamTools([]);
-    let assistantAccumulator = "";
-    let streamRafId = 0;
-    let streamErrorSummary: string | null = null;
-
-    const settingsPayload = settings;
-    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: baseline, settings: settingsPayload }),
-      });
-
-      if (!res.ok) {
-        throw new Error("Something went wrong — check your API key in Settings.");
-      }
-
-      reader = res.body?.getReader();
-      if (!reader) throw new Error("Response stream unavailable.");
-
-      const decoder = new TextDecoder();
-      let backlog = "";
-
-      loop: while (true) {
-        const { done, value } = await reader.read();
-        backlog += decoder.decode(value ?? new Uint8Array(), { stream: true });
-        const segments = backlog.split("\n");
-        backlog = segments.pop() ?? "";
-
-        for (const rawLine of segments) {
-          const line = rawLine.trim();
-          if (!line) continue;
-
-          let chunk: StreamChunk;
-          try {
-            chunk = JSON.parse(line) as StreamChunk;
-          } catch {
-            continue;
-          }
-
-          if (chunk.type === "groq_quota") {
-            const u = chunk.usage;
-            if (u && typeof u === "object") {
-              writeGroqQuotaToSession(u);
-            }
-          }
-
-          if (chunk.type === "error") {
-            const m = chunk.message;
-            const text =
-              typeof m === "string"
-                ? m
-                : m != null && typeof m === "object"
-                  ? JSON.stringify(m)
-                  : "Something went wrong.";
-            const trimmed = text.trim() ? text : "Something went wrong.";
-            setErrorBanner(trimmed);
-            streamErrorSummary = trimmed;
-          }
-
-          if (chunk.type === "tool_call") {
-            const { tool, status, id: callId } = chunk;
-            if (status === "running") {
-              setStreamTools((prev) => [
-                ...prev,
-                { tool, status: "running", rowKey: callId ?? crypto.randomUUID() },
-              ]);
-            } else {
-              setStreamTools((prev) => {
-                const next = [...prev];
-                for (let i = next.length - 1; i >= 0; i--) {
-                  const row = next[i];
-                  if (!row || row.status !== "running") continue;
-                  const matchById = callId && row.rowKey === callId;
-                  const matchByTool = row.tool === tool;
-                  if (matchById || (!callId && matchByTool)) {
-                    next[i] = { ...row, status: "done", result: chunk.result };
-                    break;
-                  }
-                }
-                return next;
-              });
-            }
-          }
-
-          if (chunk.type === "text" && chunk.delta) {
-            assistantAccumulator += chunk.delta;
-            if (!streamRafId) {
-              streamRafId = window.requestAnimationFrame(() => {
-                streamRafId = 0;
-                setStreamText(assistantAccumulator);
-              });
-            }
-          }
-
-          if (chunk.type === "done") {
-            if (streamRafId) window.cancelAnimationFrame(streamRafId);
-            streamRafId = 0;
-            setStreamText(assistantAccumulator);
-            break loop;
-          }
-        }
-
-        if (done) break;
-      }
-
-      if (streamRafId) window.cancelAnimationFrame(streamRafId);
-      setStreamText(assistantAccumulator);
-
-      const assistantMsg: Message = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content:
-          assistantAccumulator.trim() ||
-          (streamErrorSummary
-            ? `Could not finish the reply (${streamErrorSummary}). If this persists, check your connection or try again — your API key may still be fine.`
-            : "(No response — check your API key in Settings.)"),
-      };
-
-      const finalMessages = [...baseline, assistantMsg];
-      setMessages(finalMessages);
-      setStreamingAssistant(false);
-      setStreamText("");
-      setStreamTools([]);
-
-      try {
-        await appendMessagesToChat(chatId, finalMessages);
-      } catch {
-        setErrorBanner("Couldn't save the reply.");
-      }
-      void refreshChats();
-    } catch (err) {
-      setErrorBanner(
-        err instanceof Error ? err.message : "Something interrupted the response.",
-      );
-    } finally {
-      try { reader?.releaseLock(); } catch { /* noop */ }
-      if (streamRafId) window.cancelAnimationFrame(streamRafId);
-      setStreamTools([]);
-      setStreamText("");
-      setStreamingAssistant(false);
-    }
+    await runStream(baseline);
   };
+
+  const handleStop = useCallback(() => {
+    streamAbortRef.current?.abort();
+    stop();
+  }, [stop]);
+
+  const handleSpeakAssistant = useCallback(
+    (messageId: string, markdown: string) => {
+      const plain = markdownToPlainSpeech(markdown);
+      if (!plain.trim()) return;
+      void speak({
+        messageId,
+        plainText: plain,
+        voice: settings.tts.voice,
+      });
+    },
+    [speak, settings.tts.voice],
+  );
+
+  const handleRegenerate = useCallback(() => {
+    if (streamingAssistant) return;
+    stop();
+    // Drop the last assistant message and re-run from the previous user turn.
+    let lastAssistantIdx = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i]?.role === "assistant") {
+        lastAssistantIdx = i;
+        break;
+      }
+    }
+    if (lastAssistantIdx === -1) return;
+    const baseline = messages.slice(0, lastAssistantIdx);
+    setMessages(baseline);
+    void appendMessagesToChat(chatId, baseline).catch(() => {
+      setErrorBanner("Couldn't save before regenerating.");
+    });
+    void runStream(baseline);
+  }, [chatId, messages, runStream, streamingAssistant, stop]);
+
+  useEffect(() => {
+    return () => {
+      stop();
+    };
+  }, [chatId, stop]);
 
   return (
     <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-bg text-text">
@@ -291,15 +383,18 @@ export default function ChatDetailPage({
         <AppHeader
           compact
           endBeforeSettings={
-            <button
-              type="button"
-              onClick={() => setHistoryOpen(true)}
-              className={appHeaderIconButtonClassCompact}
-              aria-label="Chats"
-              style={{ boxShadow: "var(--warm-shadow)" }}
-            >
-              <ChatsIcon />
-            </button>
+            <>
+              <TtsHeaderToggle compact />
+              <button
+                type="button"
+                onClick={() => setHistoryOpen(true)}
+                className={appHeaderIconButtonClassCompact}
+                aria-label="Chats"
+                style={{ boxShadow: "var(--warm-shadow)" }}
+              >
+                <ChatsIcon />
+              </button>
+            </>
           }
         />
 
@@ -321,11 +416,17 @@ export default function ChatDetailPage({
             }))}
             streamAssistantText={streamText}
             streamingAssistant={streamingAssistant}
+            onRegenerate={handleRegenerate}
+            onSuggestion={(text) => void handleSend(text)}
+            ttsEnabled={settings.tts.enabled}
+            speakingMessageId={speakingId}
+            onSpeakAssistant={handleSpeakAssistant}
+            onStopSpeak={stop}
           />
           <InputBar
             onSend={(content, attachment) => void handleSend(content, attachment)}
+            onStop={handleStop}
             streaming={streamingAssistant}
-            disabled={streamingAssistant}
             embedded
           />
         </div>

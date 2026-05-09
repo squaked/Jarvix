@@ -1,29 +1,50 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Phase = "idle" | "ready" | "restarting" | "waiting";
 
+const POLL_INTERVAL_MS = 60_000; // background poll for the .update-ready marker
+const RESTART_GRACE_MS = 90_000; // give the server up to 90s to come back
+const RESTART_POLL_MS = 1_500;
+
 export function UpdateBanner() {
   const [phase, setPhase] = useState<Phase>("idle");
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
 
   const checkForUpdate = useCallback(async () => {
+    // Don't perturb the UI mid-restart with a stray status check.
+    if (phaseRef.current !== "idle") return;
     try {
-      const res = await fetch("/api/update-status");
-      if (res.ok) {
-        const data = (await res.json()) as { ready: boolean };
-        if (data.ready) setPhase((p) => (p === "idle" ? "ready" : p));
-      }
+      const res = await fetch("/api/update-status", {
+        cache: "no-store",
+        signal: AbortSignal.timeout(3000),
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { ready?: boolean };
+      if (data.ready) setPhase("ready");
     } catch {
-      // network unavailable — ignore
+      // network unavailable — try again on the next tick
     }
   }, []);
 
   useEffect(() => {
-    checkForUpdate();
-    const id = setInterval(checkForUpdate, 15_000);
-    return () => clearInterval(id);
+    void checkForUpdate();
+    const id = setInterval(() => void checkForUpdate(), POLL_INTERVAL_MS);
+
+    // Re-check immediately when the user returns to the tab so a long-idle
+    // session doesn't have to wait a full minute to surface a new update.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void checkForUpdate();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [checkForUpdate]);
 
   const handleRestart = useCallback(async () => {
@@ -31,19 +52,33 @@ export function UpdateBanner() {
     try {
       await fetch("/api/restart", { method: "POST" });
     } catch {
-      // expected — server closes the connection while restarting
+      // expected — the server closes the connection while restarting
     }
 
     setPhase("waiting");
 
-    // Poll until the server is back up, then reload.
+    // Poll until the new server is back, then reload. Bail out after the
+    // grace window and surface "ready" again so the user can retry.
+    const startedAt = Date.now();
     const poll = () => {
-      fetch("/api/update-status", { signal: AbortSignal.timeout(2000) })
+      fetch("/api/update-status", {
+        cache: "no-store",
+        signal: AbortSignal.timeout(2000),
+      })
         .then((r) => {
-          if (r.ok) window.location.reload();
-          else setTimeout(poll, 1000);
+          if (r.ok) {
+            window.location.reload();
+            return;
+          }
+          throw new Error("not ok");
         })
-        .catch(() => setTimeout(poll, 1000));
+        .catch(() => {
+          if (Date.now() - startedAt > RESTART_GRACE_MS) {
+            setPhase("ready");
+            return;
+          }
+          setTimeout(poll, RESTART_POLL_MS);
+        });
     };
     setTimeout(poll, 2500);
   }, []);

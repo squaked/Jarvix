@@ -1,6 +1,7 @@
 "use client";
 
 import { AppHeader } from "@/components/layout/AppHeader";
+import { TtsHeaderToggle } from "@/components/layout/TtsHeaderToggle";
 import { VoiceOrb } from "@/components/dashboard/VoiceOrb";
 import { ListeningPulseDot } from "@/components/voice/ListeningIndicator";
 import { createChat } from "@/lib/storage";
@@ -54,7 +55,7 @@ export function Dashboard() {
 
   return (
     <div className="flex flex-col min-h-screen bg-bg text-text">
-      <AppHeader />
+      <AppHeader endBeforeSettings={<TtsHeaderToggle />} />
 
       {/* Main area */}
       <main className="flex flex-col items-center flex-1 min-h-0 px-6 pt-10 pb-6 gap-12 max-w-3xl mx-auto w-full">

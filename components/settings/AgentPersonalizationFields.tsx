@@ -1,74 +1,65 @@
 "use client";
 
 import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
 import {
-  AGENT_VOICE_OPTIONS,
   DISPLAY_NAME_MAX,
   VOICE_CUSTOM_MAX,
 } from "@/lib/agent-personalization";
 import type { AgentPersonalization, AgentVoicePreset } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { VoicePresetCards } from "./VoicePresetCards";
 
 type Props = {
   value: AgentPersonalization;
   onChange: (next: AgentPersonalization) => void;
   disabled?: boolean;
+  /** Hide the name input (e.g. when shown standalone in onboarding). */
+  hideDisplayName?: boolean;
 };
 
 export function AgentPersonalizationFields({
   value,
   onChange,
   disabled = false,
+  hideDisplayName = false,
 }: Props) {
   const setVoicePreset = (voicePreset: AgentVoicePreset) =>
     onChange({ ...value, voicePreset });
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <label
-          htmlFor="agent-display-name"
-          className="block text-sm font-medium text-text"
-        >
-          What should Jarvix call you?
-        </label>
-        <Input
-          id="agent-display-name"
-          value={value.displayName}
-          maxLength={DISPLAY_NAME_MAX}
-          placeholder="Optional — first name or nickname"
-          disabled={disabled}
-          onChange={(e) =>
-            onChange({ ...value, displayName: e.target.value })
-          }
-          className="text-base"
-        />
-      </div>
+      {!hideDisplayName && (
+        <div className="space-y-2">
+          <label
+            htmlFor="agent-display-name"
+            className="block text-sm font-medium text-text"
+          >
+            What should Jarvix call you?
+          </label>
+          <Input
+            id="agent-display-name"
+            value={value.displayName}
+            maxLength={DISPLAY_NAME_MAX}
+            placeholder="Optional — first name or nickname"
+            disabled={disabled}
+            onChange={(e) =>
+              onChange({ ...value, displayName: e.target.value })
+            }
+            className="text-base"
+          />
+        </div>
+      )}
 
       <div className="space-y-3">
         <div className="space-y-2">
-          <label
-            htmlFor="agent-voice-preset"
-            className="block text-sm font-medium text-text"
-          >
-            Voice & personality
+          <label className="block text-sm font-medium text-text">
+            Voice &amp; personality
           </label>
-          <Select
-            id="agent-voice-preset"
+          <VoicePresetCards
             value={value.voicePreset}
+            onChange={setVoicePreset}
             disabled={disabled}
-            onChange={(e) =>
-              setVoicePreset(e.target.value as AgentVoicePreset)
-            }
-            className="text-base"
-          >
-            {AGENT_VOICE_OPTIONS.map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {opt.label}
-              </option>
-            ))}
-          </Select>
+          />
         </div>
 
         {value.voicePreset === "custom" ? (

@@ -8,9 +8,11 @@ import { MemoryViewer } from "@/components/settings/MemoryViewer";
 import { ProviderForm } from "@/components/settings/ProviderForm";
 import { CheckUpdatesSection } from "@/components/settings/CheckUpdatesSection";
 import { QuitSection } from "@/components/settings/QuitSection";
+import { ThemeCard } from "@/components/settings/ThemeCard";
+import { TtsSettingsCard } from "@/components/settings/TtsSettingsCard";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 export default function SettingsPage() {
   const [toastVisible, setToastVisible] = useState(false);
@@ -47,15 +49,28 @@ export default function SettingsPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-2xl px-6 py-10 flex flex-col gap-6">
-        <ProviderForm onSaved={notifySaved} />
-        <GroqUsageSection />
-        <AgentPersonalizationCard onSaved={notifySaved} />
-        <WeatherLocationCard onSaved={notifySaved} />
-        <CalendarAccessCard />
-        <MemoryViewer onSaved={notifySaved} />
-        <CheckUpdatesSection />
-        <QuitSection />
+      <div className="mx-auto max-w-2xl px-6 py-10 flex flex-col gap-10">
+        <Section title="AI">
+          <ProviderForm onSaved={notifySaved} />
+          <TtsSettingsCard onSaved={notifySaved} />
+          <GroqUsageSection />
+        </Section>
+
+        <Section title="Personal">
+          <AgentPersonalizationCard onSaved={notifySaved} />
+          <WeatherLocationCard onSaved={notifySaved} />
+          <MemoryViewer onSaved={notifySaved} />
+        </Section>
+
+        <Section title="Mac access">
+          <CalendarAccessCard />
+        </Section>
+
+        <Section title="App">
+          <ThemeCard />
+          <CheckUpdatesSection />
+          <QuitSection />
+        </Section>
       </div>
 
       {/* Saved toast */}
@@ -75,6 +90,17 @@ export default function SettingsPage() {
         ) : null}
       </AnimatePresence>
     </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-3">
+      <h2 className="px-1 text-[11px] font-semibold uppercase tracking-widest text-muted">
+        {title}
+      </h2>
+      <div className="flex flex-col gap-4">{children}</div>
+    </section>
   );
 }
 

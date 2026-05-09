@@ -24,4 +24,9 @@ export const DEFAULT_JARVIX_SETTINGS: Settings = {
   profiles: createDefaultProfiles(),
   agent: { ...DEFAULT_AGENT_PERSONALIZATION },
   weatherLocation: "Paris",
+  tts: {
+    enabled: false,
+    autoReadReplies: true,
+    voice: "hannah",
+  },
 };

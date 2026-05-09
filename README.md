@@ -1,4 +1,4 @@
-# Jarvix — Your personal AI assistant for Mac
+# Jarvix — Your AI assistant for Mac (Built for a friend)
 
 Local-first chat UI with streaming models, macOS tools, and web search.
 

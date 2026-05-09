@@ -131,7 +131,7 @@ launchctl unload "$SERVER_PLIST" 2>/dev/null || true
 launchctl load "$SERVER_PLIST"
 ok "Background service installed"
 
-# ── 8. Auto-updater LaunchAgent (daily at 3 AM) ────────────────────────────────
+# ── 8. Auto-updater LaunchAgent (every 6 hours) ───────────────────────────────
 cat > "$UPDATER_PLIST" << PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -151,7 +151,7 @@ cat > "$UPDATER_PLIST" << PLIST
     <string>${HOME}</string>
   </dict>
   <key>StartInterval</key>
-  <integer>1800</integer>
+  <integer>21600</integer>
   <key>StandardOutPath</key>
   <string>${LOG_DIR}/update.log</string>
   <key>StandardErrorPath</key>
@@ -162,7 +162,7 @@ PLIST
 
 launchctl unload "$UPDATER_PLIST" 2>/dev/null || true
 launchctl load "$UPDATER_PLIST"
-ok "Auto-updater installed (runs every 30 minutes)"
+ok "Auto-updater installed (runs every 6 hours)"
 
 # ── 9. Jarvix.app in ~/Applications ───────────────────────────────────────────
 step "Creating Jarvix app launcher..."
@@ -171,7 +171,7 @@ mkdir -p "$APP_PATH/Contents/MacOS"
 
 cat > "$APP_PATH/Contents/MacOS/Jarvix" << 'APPSCRIPT'
 #!/bin/bash
-# Jarvix.app — the server runs while this app is open.
+# Jarvix.app — opens the browser and stays alive while the server is reachable.
 # Quitting the app (Cmd+Q or Dock → Quit) stops the server.
 
 INSTALL_DIR="JARVIX_INSTALL_DIR"  # substituted below by sed
@@ -193,36 +193,39 @@ cleanup() {
 trap cleanup SIGTERM SIGINT SIGHUP
 
 # ── Start server if port 3000 is not already bound ────────────────────
-# Check lsof FIRST (port bound = process already starting or running).
-# Only start a new server if the port is completely free.
-SERVER_PID=""
+# We deliberately do NOT `wait` on the PID below — an in-app update
+# restart briefly drops the server and we want the .app to ride it out.
 if ! /usr/sbin/lsof -ti:3000 >/dev/null 2>&1; then
   mkdir -p "$INSTALL_DIR/logs"
   cd "$INSTALL_DIR"
-  npm start >> "$INSTALL_DIR/logs/server.log" 2>&1 &
-  SERVER_PID=$!
+  nohup npm start >> "$INSTALL_DIR/logs/server.log" 2>&1 &
+  disown || true
 fi
 
 # Wait for the server to respond over HTTP (covers slow cold-starts).
-for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
+for i in $(seq 1 60); do
+  /usr/bin/curl -fs --max-time 1 http://localhost:3000 >/dev/null 2>&1 && break
   sleep 1
-  /usr/bin/curl -s --max-time 1 http://localhost:3000 >/dev/null 2>&1 && break
 done
 
 # ── Open the browser ──────────────────────────────────────────────────
 /usr/bin/open "http://localhost:3000"
 
 # ── Stay alive while the server is reachable ──────────────────────────
+# Tolerate a 30-second outage so an in-app update restart doesn't kill us.
 # SIGTERM (from Dock quit) is caught by the trap above.
-if [ -n "$SERVER_PID" ]; then
-  # We own the server process — wait on it; if it exits, so do we.
-  wait "$SERVER_PID" 2>/dev/null || true
-else
-  # Server was started externally — poll HTTP until it stops responding.
-  while /usr/bin/curl -s --max-time 3 http://localhost:3000 >/dev/null 2>&1; do
-    sleep 10
-  done
-fi
+DOWN_SECONDS=0
+while true; do
+  if /usr/bin/curl -fs --max-time 3 http://localhost:3000 >/dev/null 2>&1; then
+    DOWN_SECONDS=0
+  else
+    DOWN_SECONDS=$((DOWN_SECONDS + 5))
+    if [ "$DOWN_SECONDS" -ge 30 ]; then
+      break
+    fi
+  fi
+  sleep 5
+done
 APPSCRIPT
 
 # Bake the install path into the script (avoids variable-expansion issues in heredoc).
@@ -261,7 +264,7 @@ xattr -rd com.apple.quarantine "$APP_PATH" 2>/dev/null || true
 ok "Jarvix.app created in ~/Applications"
 
 
-# ── 9. Open in browser ─────────────────────────────────────────────────────────
+# ── 10. Open in browser ───────────────────────────────────────────────────────
 step "Starting Jarvix..."
 sleep 4
 open "http://localhost:3000" 2>/dev/null || true
@@ -273,7 +276,7 @@ echo "  ║  ✅  Jarvix is installed and running!          ║"
 echo "  ║                                                ║"
 echo "  ║  Open:    http://localhost:3000                ║"
 echo "  ║  App:     ~/Applications/Jarvix.app            ║"
-echo "  ║  Updates: automatic nightly + in-app button    ║"
+echo "  ║  Updates: automatic every 6h + in-app button   ║"
 echo "  ╚════════════════════════════════════════════════╝"
 echo ""
 echo "  Tip: drag Jarvix from ~/Applications to your Dock"
