@@ -50,11 +50,6 @@ export default function SettingsPage() {
       </header>
 
       <div className="mx-auto max-w-2xl px-6 py-10 flex flex-col gap-10">
-        <Section title="AI">
-          <ProviderForm onSaved={notifySaved} />
-          <TtsSettingsCard onSaved={notifySaved} />
-        </Section>
-
         <Section title="Personal">
           <AgentPersonalizationCard onSaved={notifySaved} />
           <WeatherLocationCard onSaved={notifySaved} />
@@ -67,12 +62,17 @@ export default function SettingsPage() {
 
         <Section title="App">
           <ThemeCard />
-          <QuitSection />
         </Section>
 
-        <Section title="Technical">
+        <Section title="AI">
+          <ProviderForm onSaved={notifySaved} />
+          <TtsSettingsCard onSaved={notifySaved} />
+        </Section>
+
+        <Section title="System">
           <GroqUsageSection />
           <CheckUpdatesSection />
+          <QuitSection />
         </Section>
       </div>
 

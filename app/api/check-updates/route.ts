@@ -38,19 +38,13 @@ export async function POST(): Promise<NextResponse<CheckResult>> {
       timeout: 15_000,
     });
 
-    const { stdout: local } = await exec("git", [
-      "-C",
-      installDir,
-      "rev-parse",
-      "HEAD",
-    ]);
-    const { stdout: remote } = await exec(
+    const { stdout: countStr } = await exec(
       "git",
-      ["-C", installDir, "rev-parse", "origin/main"],
+      ["-C", installDir, "rev-list", "HEAD..origin/main", "--count"],
       { timeout: 5_000 },
     );
 
-    const upToDate = local.trim() === remote.trim();
+    const upToDate = parseInt(countStr.trim(), 10) === 0;
     if (upToDate) {
       return NextResponse.json({ upToDate });
     }

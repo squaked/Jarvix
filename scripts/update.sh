@@ -53,10 +53,10 @@ if ! git fetch origin 2>&1; then
   exit 0
 fi
 
+BEHIND="$(git rev-list HEAD..origin/main --count 2>/dev/null || echo 0)"
 BEFORE="$(git rev-parse HEAD)"
-REMOTE="$(git rev-parse origin/main 2>/dev/null || echo "$BEFORE")"
 
-if [ "$BEFORE" = "$REMOTE" ]; then
+if [ "$BEHIND" -eq 0 ]; then
   log "Already up to date."
   exit 0
 fi
