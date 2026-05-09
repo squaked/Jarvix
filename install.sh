@@ -1,6 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 
+# ── Safety Check ──────────────────────────────────────────────────────────────
+if [ "$EUID" -eq 0 ]; then
+  echo "  ✗ Please do NOT run this script with sudo."
+  echo "    Jarvix should be installed as a regular user to manage your apps and files correctly."
+  exit 1
+fi
+
 # ── Configuration ─────────────────────────────────────────────────────────────
 REPO_URL="${JARVIX_REPO_URL:-https://github.com/squaked/Jarvix.git}"
 INSTALL_DIR="${JARVIX_INSTALL_DIR:-$HOME/.jarvix-app}"
@@ -248,7 +255,11 @@ echo ""
 echo "  ╔════════════════════════════════════════════════╗"
 echo "  ║  ✅  Jarvix is installed!                      ║"
 echo "  ║                                                ║"
-echo "  ║  Opening Jarvix for you now...                 ║"
+echo "  ║      Opening Jarvix for you now...             ║"
+echo "  ║                                                ║"
+echo "  ║                                                ║"
+echo "  ║     To open anytime:                           ║"
+echo "  ║     Press ⌘ Space, type Jarvix, press Enter    ║"
 echo "  ╚════════════════════════════════════════════════╝"
 echo ""
 
