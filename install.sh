@@ -171,7 +171,7 @@ mkdir -p "$APP_PATH/Contents/MacOS"
 
 cat > "$APP_PATH/Contents/MacOS/Jarvix" << 'APPSCRIPT'
 #!/bin/bash
-# Jarvix.app — opens the browser and stays alive as long as the user wants.
+# Jarvix.app — opens the browser immediately and stays alive as long as the user wants.
 # Quitting the app (Cmd+Q or Dock → Quit) stops the server.
 # The app NEVER exits on its own — it stays in the Dock permanently.
 
@@ -208,14 +208,20 @@ start_server() {
 # ── Start server if port 3000 is not already bound ────────────────────
 start_server
 
-# Wait for the server to respond over HTTP (covers slow cold-starts).
-for i in $(seq 1 90); do
-  /usr/bin/curl -fs --max-time 1 http://localhost:3000 >/dev/null 2>&1 && break
-  sleep 1
-done
-
-# ── Open the browser ──────────────────────────────────────────────────
+# ── Open the browser immediately ─────────────────────────────────────
+# Don't block — open right away. If the server isn't ready yet,
+# the browser will show a "connection refused" page that auto-refreshes.
 /usr/bin/open "http://localhost:3000"
+
+# In the background, wait until the server is up and then refresh the page.
+(
+  for i in $(seq 1 60); do
+    /usr/bin/curl -fs --max-time 1 http://localhost:3000 >/dev/null 2>&1 && break
+    sleep 1
+  done
+  # Once ready, re-open so the browser navigates away from any error page.
+  /usr/bin/open "http://localhost:3000"
+) &
 
 # ── Stay alive permanently ────────────────────────────────────────────
 # This loop NEVER exits on its own. The app stays in the Dock.
@@ -256,6 +262,23 @@ APPSCRIPT
 sed -i '' "s|__JARVIX_INSTALL_DIR_PLACEHOLDER__|${INSTALL_DIR}|g" "$APP_PATH/Contents/MacOS/Jarvix"
 chmod +x "$APP_PATH/Contents/MacOS/Jarvix"
 
+# ── Copy icon into the app bundle ─────────────────────────────────────────────
+mkdir -p "$APP_PATH/Contents/Resources"
+
+# Convert the PNG icon to a real PNG (it may be stored as JPEG) then to ICNS
+REAL_PNG="/tmp/jarvix_icon_real.png"
+ICONSET_DIR="/tmp/Jarvix.iconset"
+mkdir -p "$ICONSET_DIR"
+sips -s format png "$INSTALL_DIR/public/icon.png" --out "$REAL_PNG" > /dev/null 2>&1 || cp "$INSTALL_DIR/public/icon.png" "$REAL_PNG"
+for size in 16 32 128 256 512; do
+  sips -z $size $size "$REAL_PNG" --out "$ICONSET_DIR/icon_${size}x${size}.png" > /dev/null
+  double=$((size * 2))
+  sips -z $double $double "$REAL_PNG" --out "$ICONSET_DIR/icon_${size}x${size}@2x.png" > /dev/null
+done
+iconutil -c icns "$ICONSET_DIR" -o "$APP_PATH/Contents/Resources/AppIcon.icns" 2>/dev/null \
+  && ok "App icon installed" \
+  || ok "App icon skipped (iconutil not available)"
+
 cat > "$APP_PATH/Contents/Info.plist" << INFOPLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -277,6 +300,8 @@ cat > "$APP_PATH/Contents/Info.plist" << INFOPLIST
   <string>11.0</string>
   <key>NSHighResolutionCapable</key>
   <true/>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
   <key>LSUIElement</key>
   <false/>
 </dict>
