@@ -209,19 +209,11 @@ start_server() {
 start_server
 
 # ── Open the browser immediately ─────────────────────────────────────
-# Don't block — open right away. If the server isn't ready yet,
-# the browser will show a "connection refused" page that auto-refreshes.
+# Don't block — open right away. The browser will show a "connection
+# refused" page briefly if the server is still cold-starting; that's fine.
+# We do NOT re-open later: doing so would cause the Dock icon to bounce
+# every time the server restarts (e.g. after an in-app update).
 /usr/bin/open "http://localhost:3000"
-
-# In the background, wait until the server is up and then refresh the page.
-(
-  for i in $(seq 1 60); do
-    /usr/bin/curl -fs --max-time 1 http://localhost:3000 >/dev/null 2>&1 && break
-    sleep 1
-  done
-  # Once ready, re-open so the browser navigates away from any error page.
-  /usr/bin/open "http://localhost:3000"
-) &
 
 # ── Stay alive permanently ────────────────────────────────────────────
 # This loop NEVER exits on its own. The app stays in the Dock.
