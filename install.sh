@@ -229,29 +229,14 @@ done
 iconutil -c icns "$ICONSET_DIR" -o "$APP_PATH/Contents/Resources/applet.icns" 2>/dev/null || true
 
 # Update Info.plist to be more "App-like"
-cat > "$APP_PATH/Contents/Info.plist" << INFOPLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>CFBundleIconFile</key>
-  <string>applet</string>
-  <key>CFBundleIdentifier</key>
-  <string>com.jarvix.launcher</string>
-  <key>CFBundleName</key>
-  <string>Jarvix</string>
-  <key>CFBundlePackageType</key>
-  <string>APPL</string>
-  <key>CFBundleShortVersionString</key>
-  <string>1.0</string>
-  <key>LSMinimumSystemVersion</key>
-  <string>11.0</string>
-  <key>NSHighResolutionCapable</key>
-  <true/>
-</dict>
-</plist>
-INFOPLIST
+plutil -replace CFBundleName -string "Jarvix" "$APP_PATH/Contents/Info.plist"
+plutil -replace CFBundleDisplayName -string "Jarvix" "$APP_PATH/Contents/Info.plist"
+plutil -replace CFBundleIdentifier -string "com.jarvix.launcher" "$APP_PATH/Contents/Info.plist"
+plutil -replace CFBundleIconFile -string "applet" "$APP_PATH/Contents/Info.plist"
+plutil -replace CFBundleIconName -string "applet" "$APP_PATH/Contents/Info.plist"
 
+# Refresh the icon cache
+touch "$APP_PATH"
 xattr -rd com.apple.quarantine "$APP_PATH" 2>/dev/null || true
 ok "Jarvix.app created in ~/Applications (Native AppleScript wrapper)"
 
