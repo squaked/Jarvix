@@ -1,11 +1,18 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import {
+  JARVIX_UPDATE_BUILD_IDLE_EVENT,
+  JARVIX_UPDATE_BUILD_STARTED_EVENT,
+  clearJarvixUpdateFastPollWindow,
+  jarvixUpdateFastPollRemainingMs,
+} from "@/lib/jarvix-update-poll";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type Phase = "idle" | "ready" | "restarting" | "waiting";
 
-const POLL_INTERVAL_MS = 60_000; // background poll for the .update-ready marker
+const POLL_SLOW_MS = 15_000;
+const POLL_FAST_MS = 3_500;
 const RESTART_GRACE_MS = 90_000; // give the server up to 90s to come back
 const RESTART_POLL_MS = 1_500;
 
@@ -37,25 +44,50 @@ export function UpdateBanner() {
       });
       if (!res.ok) return;
       const data = (await res.json()) as { ready?: boolean };
-      if (data.ready) setPhase("ready");
+      if (data.ready) {
+        clearJarvixUpdateFastPollWindow();
+        setPhase("ready");
+      }
     } catch {
       // network unavailable — try again on the next tick
     }
   }, []);
 
   useEffect(() => {
+    let intervalId: ReturnType<typeof setInterval> | undefined;
+
+    const reinstallTimer = () => {
+      if (intervalId !== undefined) {
+        clearInterval(intervalId);
+        intervalId = undefined;
+      }
+      const useFast = jarvixUpdateFastPollRemainingMs() > 0;
+      const ms = useFast ? POLL_FAST_MS : POLL_SLOW_MS;
+      intervalId = setInterval(() => void checkForUpdate(), ms);
+    };
+
+    const bump = () => {
+      void checkForUpdate();
+      reinstallTimer();
+    };
+
     void checkForUpdate();
-    const id = setInterval(() => void checkForUpdate(), POLL_INTERVAL_MS);
+    reinstallTimer();
+
+    window.addEventListener(JARVIX_UPDATE_BUILD_STARTED_EVENT, bump);
+    window.addEventListener(JARVIX_UPDATE_BUILD_IDLE_EVENT, reinstallTimer);
 
     // Re-check immediately when the user returns to the tab so a long-idle
-    // session doesn't have to wait a full minute to surface a new update.
+    // session doesn't have to wait a full interval to surface a new update.
     const onVisible = () => {
       if (document.visibilityState === "visible") void checkForUpdate();
     };
     document.addEventListener("visibilitychange", onVisible);
 
     return () => {
-      clearInterval(id);
+      if (intervalId !== undefined) clearInterval(intervalId);
+      window.removeEventListener(JARVIX_UPDATE_BUILD_STARTED_EVENT, bump);
+      window.removeEventListener(JARVIX_UPDATE_BUILD_IDLE_EVENT, reinstallTimer);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [checkForUpdate]);

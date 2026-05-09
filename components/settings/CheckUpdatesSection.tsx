@@ -2,6 +2,10 @@
 
 import { Card } from "@/components/ui/Card";
 import { jarvixDisplayVersion } from "@/lib/jarvix-version-display";
+import {
+  clearJarvixUpdateFastPollWindow,
+  startJarvixUpdateFastPollWindow,
+} from "@/lib/jarvix-update-poll";
 import { useState } from "react";
 
 type Status =
@@ -27,22 +31,31 @@ export function CheckUpdatesSection() {
 
   const check = async () => {
     setStatus("checking");
+    // Survives navigation away from Settings while the POST / spawn runs.
+    startJarvixUpdateFastPollWindow();
     setErrorMsg("");
     try {
-      const res = await fetch("/api/check-updates", { method: "POST" });
+      const res = await fetch("/api/check-updates", {
+        method: "POST",
+        keepalive: true,
+      });
       const data = (await res.json().catch(() => ({}))) as CheckResponse;
       if (!res.ok || data.error) {
         throw new Error(data.error || `Server error ${res.status}`);
       }
       if (data.ready) {
+        clearJarvixUpdateFastPollWindow();
         setStatus("ready");
       } else if (data.upToDate) {
+        clearJarvixUpdateFastPollWindow();
         setStatus("upToDate");
         setTimeout(() => setStatus((s) => (s === "upToDate" ? "idle" : s)), 4000);
       } else {
+        // building / alreadyRunning — keep fast polling until `.update-ready` appears
         setStatus("building");
       }
     } catch (e) {
+      clearJarvixUpdateFastPollWindow();
       setErrorMsg(e instanceof Error ? e.message : "Something went wrong");
       setStatus("error");
     }
