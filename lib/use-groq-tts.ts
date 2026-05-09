@@ -1,6 +1,7 @@
 "use client";
 
 import { chunkTextForOrpheus } from "@/lib/tts-chunk";
+import type { Settings } from "@/lib/types";
 import { useCallback, useRef, useState } from "react";
 
 function playBlob(blob: Blob, signal: AbortSignal): Promise<void> {
@@ -63,8 +64,10 @@ export function useGroqTts() {
       messageId: string;
       plainText: string;
       voice: string;
+      /** Sent with each request like `/api/chat` so TTS sees the same Groq key. */
+      settings: Settings;
     }) => {
-      const { messageId, plainText, voice } = opts;
+      const { messageId, plainText, voice, settings } = opts;
       abortRef.current?.abort();
 
       const chunks = chunkTextForOrpheus(plainText);
@@ -81,7 +84,7 @@ export function useGroqTts() {
           const res = await fetch("/api/tts", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: chunk, voice }),
+            body: JSON.stringify({ text: chunk, voice, settings }),
             signal: ctrl.signal,
           });
 

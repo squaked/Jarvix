@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
-import { hasActiveApiKey } from "@/lib/settings-credentials";
-import { mergeSettingsPartial } from "@/lib/settings-merge";
+import {
+  resolveGroqApiKey,
+} from "@/lib/settings-credentials";
+import { mergeProfileRecords, mergeSettingsPartial } from "@/lib/settings-merge";
 import { readSettingsFile } from "@/lib/settings-file-store";
-import type { TtsVoiceId } from "@/lib/types";
+import type { Settings, TtsVoiceId } from "@/lib/types";
 import { chunkTextForOrpheus } from "@/lib/tts-chunk";
 import {
   ORPHEUS_ENGLISH_VOICES,
@@ -17,7 +19,21 @@ const GROQ_SPEECH_URL = "https://api.groq.com/openai/v1/audio/speech";
 type Body = {
   text?: unknown;
   voice?: unknown;
+  /** Mirrors chat: browser settings (key may exist here before disk save). */
+  settings?: unknown;
 };
+
+function mergedAuthSettings(client: unknown, disk: Settings): Settings {
+  if (!client || typeof client !== "object") return disk;
+  const c = client as Partial<Settings>;
+  return mergeSettingsPartial({
+    ...disk,
+    profiles:
+      c.profiles != null
+        ? mergeProfileRecords(disk.profiles, c.profiles)
+        : disk.profiles,
+  });
+}
 
 /**
  * Generate speech via Groq Orpheus (wav). Input is chunked to 200 characters
@@ -63,12 +79,12 @@ export async function POST(req: Request) {
     );
   }
 
-  const settings = mergeSettingsPartial(await readSettingsFile());
-  if (!hasActiveApiKey(settings)) {
+  const disk = mergeSettingsPartial(await readSettingsFile());
+  const merged = mergedAuthSettings(body.settings, disk);
+  const apiKey = resolveGroqApiKey(merged);
+  if (!apiKey) {
     return NextResponse.json({ error: "No API key configured" }, { status: 401 });
   }
-
-  const apiKey = settings.profiles.groq.apiKey.trim();
   const res = await fetch(GROQ_SPEECH_URL, {
     method: "POST",
     headers: {

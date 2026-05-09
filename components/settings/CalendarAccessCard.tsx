@@ -123,10 +123,5 @@ function StatusBadge({ status }: { status: Status }) {
       </div>
     );
   }
-  return (
-    <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/[0.07] px-3 py-2 text-xs text-amber-600 dark:text-amber-300">
-      <span className="h-2 w-2 rounded-full bg-amber-500" />
-      Not granted yet — open Privacy Settings to allow.
-    </div>
-  );
+  return null;
 }

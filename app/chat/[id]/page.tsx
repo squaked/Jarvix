@@ -287,6 +287,7 @@ export default function ChatDetailPage({
             messageId: assistantMsg.id,
             plainText: plain,
             voice: payloadTts.voice,
+            settings: settingsPayload,
           });
         }
       }
@@ -339,9 +340,10 @@ export default function ChatDetailPage({
         messageId,
         plainText: plain,
         voice: settings.tts.voice,
+        settings,
       });
     },
-    [speak, settings.tts.voice],
+    [speak, settings],
   );
 
   const handleRegenerate = useCallback(() => {

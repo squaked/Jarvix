@@ -19,6 +19,7 @@ export function TtsSettingsCard({ onSaved }: Props) {
   const { settings, saveSettings } = useJarvixSettings();
   const tts = settings.tts;
   const [previewBusy, setPreviewBusy] = useState<TtsVoiceId | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const patch = async (next: typeof tts) => {
     await saveSettings({ tts: next });
@@ -26,23 +27,44 @@ export function TtsSettingsCard({ onSaved }: Props) {
   };
 
   const previewVoice = async (voiceId: TtsVoiceId) => {
+    setPreviewError(null);
     setPreviewBusy(voiceId);
     try {
       const text = TTS_VOICE_SAMPLE[voiceId];
       const res = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice: voiceId }),
+        body: JSON.stringify({ text, voice: voiceId, settings }),
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        let msg =
+          res.status === 401
+            ? "Add your Groq API key (or set GROQ_API_KEY on the server) to use previews."
+            : `Preview failed (${res.status}).`;
+        try {
+          const err = (await res.json()) as { error?: string };
+          if (typeof err.error === "string" && err.error.trim()) {
+            msg = err.error.trim();
+          }
+        } catch {
+          /* noop */
+        }
+        setPreviewError(msg);
+        return;
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       audio.onended = () => URL.revokeObjectURL(url);
-      audio.onerror = () => URL.revokeObjectURL(url);
+      audio.onerror = () => {
+        URL.revokeObjectURL(url);
+        setPreviewError("Playback failed.");
+      };
       await audio.play();
     } catch {
-      /* autoplay blocked or network */
+      setPreviewError(
+        "Playback blocked or network error — allow audio or try again.",
+      );
     } finally {
       setPreviewBusy(null);
     }
@@ -108,6 +130,14 @@ export function TtsSettingsCard({ onSaved }: Props) {
 
       <div className="space-y-2">
         <p className="text-sm font-medium text-text">Voice</p>
+        {previewError ? (
+          <p
+            className="rounded-xl border border-red-500/30 bg-red-500/[0.07] px-3 py-2 text-sm text-red-600 dark:text-red-400"
+            role="alert"
+          >
+            {previewError}
+          </p>
+        ) : null}
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {ORPHEUS_ENGLISH_VOICES.map((v) => {
             const selected = tts.voice === v.id;

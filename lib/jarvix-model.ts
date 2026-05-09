@@ -1,5 +1,6 @@
 import { createGroq } from "@ai-sdk/groq";
 import { JARVIX_GROQ_CHAT_MODEL } from "./provider-options";
+import { resolveGroqApiKey } from "./settings-credentials";
 import type { Settings } from "./types";
 
 /**
@@ -7,9 +8,7 @@ import type { Settings } from "./types";
  * Chat model id is fixed ({@link JARVIX_GROQ_CHAT_MODEL}); stored profile `model` is ignored for chat.
  */
 export function getLanguageModel(settings: Settings) {
-  const profile = settings.profiles.groq;
-  const apiKey =
-    profile.apiKey.trim() || process.env.GROQ_API_KEY?.trim() || "";
+  const apiKey = resolveGroqApiKey(settings);
   if (!apiKey) {
     throw new Error(
       "Missing Groq API key. Paste your key in Jarvix settings or set GROQ_API_KEY in your environment.",
