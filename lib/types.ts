@@ -13,7 +13,6 @@ export type AgentVoicePreset =
   | "balanced"
   | "warm"
   | "professional"
-  | "concise"
   | "custom";
 
 /** Saved onboarding / Settings — shapes how Jarvix speaks (not replacing safety rules). */

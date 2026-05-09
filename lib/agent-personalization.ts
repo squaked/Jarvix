@@ -14,7 +14,6 @@ export const AGENT_VOICE_PRESETS = [
   "balanced",
   "warm",
   "professional",
-  "concise",
   "custom",
 ] as const satisfies readonly AgentVoicePreset[];
 
@@ -28,7 +27,6 @@ export const AGENT_VOICE_OPTIONS: readonly {
   { id: "balanced", label: "Balanced" },
   { id: "warm", label: "Warm" },
   { id: "professional", label: "Professional" },
-  { id: "concise", label: "Concise" },
   { id: "custom", label: "Custom" },
 ];
 
@@ -39,14 +37,12 @@ const VOICE_PROMPTS: Record<Exclude<AgentVoicePreset, "custom">, string> = {
     "Warm — encouraging and patient; clear explanations without talking down.",
   professional:
     "Professional — polished and neutral; avoid slang and jokes unless the user invites them.",
-  concise:
-    "Concise — tight summaries and bullets; skip preamble.",
 };
 
 /** Older installs may reference dropped presets — coerce into current four (+ custom handled separately). */
 const LEGACY_VOICE_TO_CURRENT: Record<string, AgentVoicePreset> = {
   trusted_operator: "balanced",
-  laconic: "concise",
+  laconic: "balanced",
   playful: "warm",
   enthusiast: "warm",
 };
@@ -55,7 +51,7 @@ const LEGACY_VOICE_TO_CURRENT: Record<string, AgentVoicePreset> = {
 const LEGACY_TONE_MAP: Record<string, AgentVoicePreset> = {
   balanced: "balanced",
   warm: "warm",
-  concise: "concise",
+  concise: "balanced",
   professional: "professional",
   playful: "warm",
 };
@@ -141,7 +137,7 @@ export function normalizeAgentPersonalization(raw: unknown): AgentPersonalizatio
     } else if (oldPersonality === "warm_mentor") {
       return { displayName, voicePreset: "warm", voiceCustom: "" };
     } else if (oldPersonality === "laconic") {
-      return { displayName, voicePreset: "concise", voiceCustom: "" };
+      return { displayName, voicePreset: "balanced", voiceCustom: "" };
     } else if (oldPersonality === "enthusiast") {
       return { displayName, voicePreset: "warm", voiceCustom: "" };
     }

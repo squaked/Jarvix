@@ -24,10 +24,6 @@ const VOICE_TASTE: Record<AgentVoicePreset, { headline: string; example: string 
     headline: "Polished and neutral.",
     example: "“Understood. I’ll handle that and report back.”",
   },
-  concise: {
-    headline: "Tight, no preamble.",
-    example: "“Done. 3 events on your calendar today.”",
-  },
   custom: {
     headline: "Write your own.",
     example: "Describe how Jarvix should sound in your own words.",
