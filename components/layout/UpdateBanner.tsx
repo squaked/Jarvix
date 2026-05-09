@@ -35,8 +35,14 @@ export function UpdateBanner() {
   phaseRef.current = phase;
 
   const checkForUpdate = useCallback(async () => {
-    // Don't perturb the UI mid-restart with a stray status check.
-    if (phaseRef.current !== "idle") return;
+    // Mid-restart: wait for restart flow — don't flicker banner state.
+    if (
+      phaseRef.current === "restarting" ||
+      phaseRef.current === "waiting"
+    ) {
+      return;
+    }
+
     try {
       const res = await fetch("/api/update-status", {
         cache: "no-store",
@@ -44,9 +50,17 @@ export function UpdateBanner() {
       });
       if (!res.ok) return;
       const data = (await res.json()) as { ready?: boolean };
-      if (data.ready) {
+
+      if (data.ready === true) {
         clearJarvixUpdateFastPollWindow();
         setPhase("ready");
+        return;
+      }
+
+      // Dismiss stale "Update ready" without killing fast polls while idle/building.
+      if (phaseRef.current === "ready") {
+        clearJarvixUpdateFastPollWindow();
+        setPhase("idle");
       }
     } catch {
       // network unavailable — try again on the next tick
@@ -110,12 +124,17 @@ export function UpdateBanner() {
         cache: "no-store",
         signal: fetchTimeoutSignal(2000),
       })
-        .then((r) => {
-          if (r.ok) {
+        .then(async (r) => {
+          if (!r.ok) throw new Error("not ok");
+          const body = (await r.json().catch(() => ({}))) as {
+            ready?: boolean;
+          };
+          // Marker cleared (or stale-reconciled) — refresh so the banner drops.
+          if (body.ready !== true) {
             window.location.reload();
             return;
           }
-          throw new Error("not ok");
+          throw new Error("still pending");
         })
         .catch(() => {
           if (Date.now() - startedAt > RESTART_GRACE_MS) {
