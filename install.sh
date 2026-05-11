@@ -178,12 +178,13 @@ launchctl load "$UPDATER_PLIST"
 ok "Auto-updater installed"
 
 # ── 9. Jarvix.app in ~/Applications ───────────────────────────────────────────
-step "Creating Jarvix app launcher..."
+step "Building Jarvix app (Electron — downloads ~130 MB on first run)..."
 mkdir -p "$HOME/Applications"
 
-# Delegate the full applet build to scripts/macos/rebuild-app.sh. That script is
-# the single source of truth for the bundle layout (AppleScript handlers, icon,
-# Info.plist keys, codesign). install.sh just kicks it off.
+# Delegate the Electron build to scripts/macos/rebuild-app.sh. That script is
+# the single source of truth: it compiles the TypeScript main process, runs
+# electron-builder --mac dir, ad-hoc signs the bundle, and registers it with
+# Launch Services. install.sh just kicks it off.
 chmod +x "$INSTALL_DIR/scripts/macos/rebuild-app.sh"
 chmod +x "$INSTALL_DIR/scripts/macos/launcher.sh" "$INSTALL_DIR/scripts/macos/quit-server.sh"
 chmod +x "$INSTALL_DIR/scripts/reset-session-logs.sh"

@@ -1,0 +1,229 @@
+import { app, BrowserWindow, Menu, shell } from "electron";
+import type { MenuItemConstructorOptions } from "electron";
+import * as http from "http";
+
+const PORT = 3000;
+const SERVER_URL = `http://localhost:${PORT}`;
+
+let mainWindow: BrowserWindow | null = null;
+let reconnectTimer: ReturnType<typeof setInterval> | null = null;
+
+// ── Single instance ──────────────────────────────────────────────────────────
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+
+  app.whenReady().then(createWindow);
+
+  // On macOS, keep the app alive when all windows are closed (standard behavior).
+  // The Next.js server continues independently via LaunchAgent.
+  app.on("window-all-closed", () => {});
+
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    } else {
+      mainWindow?.show();
+      mainWindow?.focus();
+    }
+  });
+}
+
+// ── Server health check ──────────────────────────────────────────────────────
+function isServerUp(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const req = http.get(SERVER_URL, (res) => {
+      res.resume();
+      resolve(typeof res.statusCode === "number" && res.statusCode < 500);
+    });
+    req.setTimeout(1500, () => {
+      req.destroy();
+      resolve(false);
+    });
+    req.on("error", () => resolve(false));
+  });
+}
+
+async function waitForServer(maxMs = 60_000): Promise<boolean> {
+  const deadline = Date.now() + maxMs;
+  while (Date.now() < deadline) {
+    if (await isServerUp()) return true;
+    await new Promise<void>((r) => setTimeout(r, 600));
+  }
+  return false;
+}
+
+// ── Loading screen ───────────────────────────────────────────────────────────
+// Renders a minimal dark splash page while the Next.js server is warming up.
+function loadingPage(label = "Starting Jarvix\u2026"): string {
+  const safe = label.replace(/[<>&"]/g, (c) =>
+    ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c] ?? c)
+  );
+  return (
+    "data:text/html;charset=utf-8," +
+    encodeURIComponent(`<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#0a0a0a;overflow:hidden}
+body{display:flex;flex-direction:column;align-items:center;
+     justify-content:center;gap:14px;color:#666;
+     font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;
+     -webkit-app-region:drag}
+.dots{display:flex;gap:7px}
+.dot{width:6px;height:6px;border-radius:50%;background:#555;
+     animation:p 1.2s ease-in-out infinite}
+.dot:nth-child(2){animation-delay:.2s}
+.dot:nth-child(3){animation-delay:.4s}
+@keyframes p{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}
+.lbl{font-size:13px;letter-spacing:.01em}
+</style></head>
+<body>
+<div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+<div class="lbl">${safe}</div>
+</body></html>`)
+  );
+}
+
+// ── Window ───────────────────────────────────────────────────────────────────
+function createWindow(): void {
+  mainWindow = new BrowserWindow({
+    width: 1280,
+    height: 820,
+    minWidth: 820,
+    minHeight: 580,
+    backgroundColor: "#0a0a0a",
+    show: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+    },
+  });
+
+  setupMenu();
+
+  void mainWindow.loadURL(loadingPage());
+  mainWindow.once("ready-to-show", () => mainWindow?.show());
+
+  // Open target="_blank" and window.open() links in the system browser
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    void shell.openExternal(url);
+    return { action: "deny" };
+  });
+
+  // Detect server going offline (relaunch.sh restart gap, or /api/quit)
+  mainWindow.webContents.on("did-fail-load", (_e, code, _desc, url) => {
+    if (url.startsWith(SERVER_URL) && isConnectionRefused(code)) {
+      beginReconnect();
+    }
+  });
+
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+    clearReconnect();
+  });
+
+  void bootConnect();
+}
+
+async function bootConnect(): Promise<void> {
+  if (await waitForServer(60_000)) {
+    mainWindow?.loadURL(SERVER_URL);
+  } else {
+    mainWindow?.loadURL(
+      loadingPage("Server unavailable \u2014 try restarting Jarvix.")
+    );
+  }
+}
+
+// ── Auto-reconnect after server restart (relaunch.sh gap) ───────────────────
+function isConnectionRefused(code: number): boolean {
+  // ERR_CONNECTION_REFUSED / ERR_ADDRESS_UNREACHABLE / ERR_TIMED_OUT
+  return code === -102 || code === -106 || code === -7;
+}
+
+function beginReconnect(): void {
+  if (reconnectTimer) return;
+  mainWindow?.loadURL(loadingPage("Restarting\u2026"));
+  reconnectTimer = setInterval(async () => {
+    if (!mainWindow) {
+      clearReconnect();
+      return;
+    }
+    if (await isServerUp()) {
+      clearReconnect();
+      void mainWindow.loadURL(SERVER_URL);
+    }
+  }, 1000);
+}
+
+function clearReconnect(): void {
+  if (reconnectTimer) {
+    clearInterval(reconnectTimer);
+    reconnectTimer = null;
+  }
+}
+
+// ── Application menu ─────────────────────────────────────────────────────────
+function setupMenu(): void {
+  const template: MenuItemConstructorOptions[] = [
+    {
+      label: app.name,
+      submenu: [
+        { role: "about" },
+        { type: "separator" },
+        { role: "services" },
+        { type: "separator" },
+        { role: "hide" },
+        { role: "hideOthers" },
+        { role: "unhide" },
+        { type: "separator" },
+        { role: "quit" },
+      ],
+    },
+    {
+      label: "Edit",
+      submenu: [
+        { role: "undo" },
+        { role: "redo" },
+        { type: "separator" },
+        { role: "cut" },
+        { role: "copy" },
+        { role: "paste" },
+        { role: "pasteAndMatchStyle" },
+        { role: "selectAll" },
+      ],
+    },
+    {
+      label: "View",
+      submenu: [
+        { role: "reload" },
+        { role: "forceReload" },
+        { type: "separator" },
+        { role: "resetZoom" },
+        { role: "zoomIn" },
+        { role: "zoomOut" },
+        { type: "separator" },
+        { role: "togglefullscreen" },
+      ],
+    },
+    {
+      label: "Window",
+      submenu: [
+        { role: "minimize" },
+        { role: "zoom" },
+        { type: "separator" },
+        { role: "front" },
+      ],
+    },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}

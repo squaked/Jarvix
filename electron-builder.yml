@@ -1,0 +1,35 @@
+appId: com.jarvix.app
+productName: Jarvix
+copyright: Jarvix
+
+# Entry point inside the packaged asar
+main: electron-dist/main.js
+
+# Include ONLY the compiled Electron main process — the Next.js server runs
+# separately as a LaunchAgent and is never bundled into the .app.
+files:
+  - electron-dist/main.js
+
+mac:
+  category: public.app-category.productivity
+  # Relative path to PNG — electron-builder auto-converts to .icns
+  icon: public/icon.png
+  # identity: null  → skip codesign inside electron-builder entirely.
+  # rebuild-app.sh performs a post-build ad-hoc codesign (codesign --sign -)
+  # which is sufficient for a locally-built app (no quarantine attribute).
+  identity: null
+  gatekeeperAssess: false
+  darkModeSupport: true
+  extendInfo:
+    # Prevent macOS from opening a second Jarvix instance from the Dock
+    LSMultipleInstancesProhibited: true
+  target:
+    # --dir produces a raw .app directory (no DMG/installer).
+    # The architecture is passed via --arch in rebuild-app.sh so this
+    # builds only for the current machine, keeping the first install fast.
+    - dir
+
+directories:
+  output: dist/electron-build
+  # Separate resources folder keeps build assets out of the project root
+  buildResources: electron-resources

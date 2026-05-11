@@ -11,7 +11,11 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "build:macos-helper": "bash scripts/macos/JarvixEventKitHelper/build.sh"
+    "build:macos-helper": "bash scripts/macos/JarvixEventKitHelper/build.sh",
+    "electron:compile": "tsc -p tsconfig.electron.json",
+    "electron:pack": "electron-builder --mac dir",
+    "electron:build": "npm run electron:compile && npm run electron:pack",
+    "electron:dev": "npm run electron:compile && electron electron-dist/main.js"
   },
   "dependencies": {
     "@ai-sdk/groq": "^3.0.38",
@@ -39,6 +43,8 @@
     "@types/node": "^20.17.50",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
+    "electron": "^36.9.5",
+    "electron-builder": "^25.1.8",
     "eslint": "^8.57.1",
     "eslint-config-next": "14.2.35",
     "postcss": "^8.5.3",

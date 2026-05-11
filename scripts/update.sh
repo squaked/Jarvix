@@ -114,11 +114,10 @@ log "Build complete."
 # fresh clone leaves them without +x on some filesystems.
 chmod +x "$INSTALL_DIR/scripts/macos/launcher.sh" "$INSTALL_DIR/scripts/macos/quit-server.sh" 2>/dev/null || true
 
-# Rebuild the .app bundle if the AppleScript template (rebuild-app.sh) or the
-# scripts it embeds were updated. Cheap to run and keeps the Dock launcher in
-# sync with the rest of the install.
-if git diff --name-only "$ROLLBACK_REV" HEAD | grep -qE '^scripts/macos/(rebuild-app|launcher|quit-server)\.sh$'; then
-  log "macOS launcher scripts changed — rebuilding Jarvix.app..."
+# Rebuild the Electron .app bundle if the Electron main process source,
+# its builder config, or the rebuild script itself changed.
+if git diff --name-only "$ROLLBACK_REV" HEAD | grep -qE '^(electron/|electron-builder\.yml|tsconfig\.electron\.json|scripts/macos/rebuild-app\.sh)'; then
+  log "Electron sources changed — rebuilding Jarvix.app..."
   /bin/bash "$INSTALL_DIR/scripts/macos/rebuild-app.sh" >> "$INSTALL_DIR/logs/update.log" 2>&1 || \
     log "rebuild-app.sh failed — keeping previous Jarvix.app."
 fi
