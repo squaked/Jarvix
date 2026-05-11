@@ -19,7 +19,7 @@ export function resolveEventKitHelperExecutable(): string | null {
   if (fromEnv && fs.existsSync(fromEnv)) return fromEnv;
   const rel = path.join(
     process.cwd(),
-    "scripts/macos/JarvixEventKitHelper.app/Contents/MacOS/JarvixEventKitHelper",
+    "scripts/macos/JarvixEventKitHelper/JarvixEventKitHelper.app/Contents/MacOS/JarvixEventKitHelper",
   );
   if (fs.existsSync(rel)) return rel;
   return null;
