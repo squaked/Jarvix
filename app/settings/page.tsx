@@ -7,7 +7,6 @@ import { GroqUsageSection } from "@/components/settings/GroqUsageSection";
 import { MemoryViewer } from "@/components/settings/MemoryViewer";
 import { ProviderForm } from "@/components/settings/ProviderForm";
 import { CheckUpdatesSection } from "@/components/settings/CheckUpdatesSection";
-import { QuitSection } from "@/components/settings/QuitSection";
 import { ThemeCard } from "@/components/settings/ThemeCard";
 import { TtsSettingsCard } from "@/components/settings/TtsSettingsCard";
 import { AboutCard } from "@/components/settings/AboutCard";
@@ -73,7 +72,6 @@ export default function SettingsPage() {
         <Section title="System">
           <GroqUsageSection />
           <CheckUpdatesSection />
-          <QuitSection />
         </Section>
 
         <Section title="About">
