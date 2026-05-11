@@ -111,7 +111,7 @@ log "Build complete."
 # Make sure the install-specific scripts are executable. They are checked into
 # git now (path-independent) so they can't go missing on `git pull`, but a
 # fresh clone leaves them without +x on some filesystems.
-chmod +x "$INSTALL_DIR/scripts/macos/launcher.sh" "$INSTALL_DIR/scripts/macos/quit-server.sh" 2>/dev/null || true
+chmod +x "$INSTALL_DIR/scripts/macos/launcher.sh" "$INSTALL_DIR/scripts/macos/quit-server.sh" "$INSTALL_DIR/scripts/load-jarvix-port.sh" 2>/dev/null || true
 
 # Rebuild the Electron .app bundle if the Electron main process source,
 # its builder config, or the rebuild script itself changed.

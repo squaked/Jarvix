@@ -23,9 +23,7 @@ mac:
     # Prevent macOS from opening a second Jarvix instance from the Dock
     LSMultipleInstancesProhibited: true
   target:
-    # --dir produces a raw .app directory (no DMG/installer).
-    # The architecture is passed via --arch in rebuild-app.sh so this
-    # builds only for the current machine, keeping the first install fast.
+    # Target is --dir; native arch is selected with --arm64 or --x64 in rebuild-app.sh.
     - dir
 
 directories:

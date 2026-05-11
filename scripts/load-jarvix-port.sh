@@ -1,18 +1,17 @@
-#!/bin/bash
-# Loads JARVIX_HTTP_PORT and PORT from scripts/jarvix.port (single line: port number).
-# Override for testing: export JARVIX_HTTP_PORT=... before sourcing.
-_port_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-_port_file="${_port_dir}/jarvix.port"
-_default=47389
-if [ -n "${JARVIX_HTTP_PORT:-}" ] && [[ "${JARVIX_HTTP_PORT}" =~ ^[0-9]+$ ]]; then
-  :
-elif [ -f "$_port_file" ]; then
-  JARVIX_HTTP_PORT="$(tr -d '[:space:]' < "$_port_file" | head -1)"
-else
-  JARVIX_HTTP_PORT="$_default"
+# shellcheck shell=bash
+# Sourced by start-server.sh, launcher.sh, relaunch.sh, uninstall.sh, and npm dev.
+# Default port must match the digit in scripts/jarvix.port (fallback below).
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+_RAW=""
+if [ -r "${_SCRIPT_DIR}/jarvix.port" ]; then
+  IFS= read -r _RAW <"${_SCRIPT_DIR}/jarvix.port" || _RAW=""
 fi
-if ! [[ "${JARVIX_HTTP_PORT}" =~ ^[0-9]+$ ]] || [ "$JARVIX_HTTP_PORT" -lt 1024 ] || [ "$JARVIX_HTTP_PORT" -gt 65535 ]; then
-  JARVIX_HTTP_PORT="$_default"
+_DEFAULT="$(echo "${_RAW}" | tr -d '[:space:]')"
+
+if ! [[ "${_DEFAULT}" =~ ^[0-9]+$ ]] || [ "${_DEFAULT}" -lt 1 ] || [ "${_DEFAULT}" -gt 65535 ]; then
+  _DEFAULT=52741
 fi
+
+JARVIX_HTTP_PORT="${JARVIX_HTTP_PORT:-${_DEFAULT}}"
 export JARVIX_HTTP_PORT
-export PORT="$JARVIX_HTTP_PORT"
+export PORT="${PORT:-${JARVIX_HTTP_PORT}}"

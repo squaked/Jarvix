@@ -1,37 +1,57 @@
 import { app, BrowserWindow, Menu, shell } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
-import { spawn } from "child_process";
-import * as fs from "fs";
+import * as fs from "node:fs";
 import * as http from "http";
 import * as os from "os";
 import * as path from "path";
+import { spawn } from "node:child_process";
 
-/** Must stay in sync with `scripts/jarvix.port` default in `load-jarvix-port.sh`. */
-const DEFAULT_HTTP_PORT = 47389;
+/** Must match `scripts/jarvix.port` (fallback if the file is missing). */
+const DEFAULT_HTTP_PORT = 52741;
 
-let mainWindow: BrowserWindow | null = null;
-let reconnectTimer: ReturnType<typeof setInterval> | null = null;
-
-function installDir(): string {
-  return (
-    process.env.JARVIX_INSTALL_DIR ?? path.join(os.homedir(), ".jarvix-app")
-  );
+function resolveInstallDir(): string {
+  return process.env.JARVIX_INSTALL_DIR ?? path.join(os.homedir(), ".jarvix-app");
 }
 
 function httpPort(): number {
-  const p = path.join(installDir(), "scripts", "jarvix.port");
-  try {
-    const raw = fs.readFileSync(p, "utf8").trim();
-    const n = parseInt(raw, 10);
-    if (Number.isFinite(n) && n >= 1024 && n <= 65535) return n;
-  } catch {
-    /* missing or unreadable */
+  const env = process.env.JARVIX_HTTP_PORT?.trim();
+  if (env && /^\d+$/.test(env)) {
+    const n = Number.parseInt(env, 10);
+    if (n >= 1 && n <= 65535) return n;
+  }
+  // Order matters when packaged: cwd may be "/" or unrelated — only consult it
+  // during unpackaged dev (npm run electron:dev).
+  const roots: string[] = [];
+  const inst = process.env.JARVIX_INSTALL_DIR?.trim();
+  if (inst) roots.push(inst);
+  roots.push(path.join(os.homedir(), ".jarvix-app"));
+  if (!app.isPackaged) {
+    roots.push(process.cwd());
+  }
+
+  const seen = new Set<string>();
+  for (const root of roots) {
+    if (seen.has(root)) continue;
+    seen.add(root);
+    const portFile = path.join(root, "scripts", "jarvix.port");
+    try {
+      const raw = fs.readFileSync(portFile, "utf8").trim().split(/\s+/)[0];
+      if (raw && /^\d+$/.test(raw)) {
+        const n = Number.parseInt(raw, 10);
+        if (n >= 1 && n <= 65535) return n;
+      }
+    } catch {
+      // try next root
+    }
   }
   return DEFAULT_HTTP_PORT;
 }
 
 const PORT = httpPort();
 const SERVER_URL = `http://127.0.0.1:${PORT}`;
+
+let mainWindow: BrowserWindow | null = null;
+let reconnectTimer: ReturnType<typeof setInterval> | null = null;
 
 // ── Single instance ──────────────────────────────────────────────────────────
 const gotTheLock = app.requestSingleInstanceLock();
@@ -160,11 +180,13 @@ function createWindow(): void {
 }
 
 // ── Install dir + server spawning ────────────────────────────────────────────
+// Electron does not bundle the Next.js server; LaunchAgent and/or launcher.sh
+// start it. JARVIX_INSTALL_DIR is set by the LaunchAgent; the Dock uses ~/.jarvix-app.
 function ensureServerRunning(): void {
-  const dir = installDir();
+  const dir = resolveInstallDir();
   const launcherScript = path.join(dir, "scripts", "macos", "launcher.sh");
-  // launcher.sh is idempotent: it exits immediately if the server is already
-  // listening on the Jarvix port, so it's safe to call unconditionally.
+  // launcher.sh is idempotent: it exits immediately if our HTTP port is
+  // already listening, so it's safe to call unconditionally.
   const child = spawn("/bin/bash", [launcherScript], {
     detached: true,
     stdio: "ignore",
@@ -173,6 +195,8 @@ function ensureServerRunning(): void {
       ...process.env,
       PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin:${process.env.PATH ?? ""}`,
       JARVIX_INSTALL_DIR: dir,
+      JARVIX_HTTP_PORT: String(PORT),
+      PORT: String(PORT),
     },
   });
   child.unref();

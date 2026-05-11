@@ -23,7 +23,8 @@ if [ -f "$INSTALL_DIR/scripts/load-jarvix-port.sh" ]; then
   # shellcheck source=load-jarvix-port.sh
   source "$INSTALL_DIR/scripts/load-jarvix-port.sh"
 else
-  JARVIX_HTTP_PORT=47389
+  # Fallback only if the install dir is already gone — must match load-jarvix-port.sh / jarvix.port
+  JARVIX_HTTP_PORT=52741
   export JARVIX_HTTP_PORT
 fi
 SERVER_PID="$(/usr/sbin/lsof -ti:"$JARVIX_HTTP_PORT" -sTCP:LISTEN 2>/dev/null | head -1 || true)"

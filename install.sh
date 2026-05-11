@@ -186,8 +186,8 @@ mkdir -p "$HOME/Applications"
 # electron-builder --mac dir, ad-hoc signs the bundle, and registers it with
 # Launch Services. install.sh just kicks it off.
 chmod +x "$INSTALL_DIR/scripts/macos/rebuild-app.sh"
-chmod +x "$INSTALL_DIR/scripts/load-jarvix-port.sh"
 chmod +x "$INSTALL_DIR/scripts/macos/launcher.sh" "$INSTALL_DIR/scripts/macos/quit-server.sh"
+chmod +x "$INSTALL_DIR/scripts/load-jarvix-port.sh"
 chmod +x "$INSTALL_DIR/scripts/reset-session-logs.sh"
 /bin/bash "$INSTALL_DIR/scripts/macos/rebuild-app.sh" | sed 's/^/    /'
 ok "Jarvix.app created in ~/Applications"
