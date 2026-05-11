@@ -192,9 +192,15 @@ function isConnectionRefused(code: number): boolean {
   return code === -102 || code === -106 || code === -7;
 }
 
+// How long to keep trying before giving up. Chosen to comfortably outlast a
+// full relaunch.sh restart cycle (~5–35 s) while not looping forever after
+// the user intentionally quits the server from the settings page.
+const RECONNECT_MAX_MS = 70_000;
+
 function beginReconnect(): void {
   if (reconnectTimer) return;
   mainWindow?.loadURL(loadingPage("Restarting\u2026"));
+  const deadline = Date.now() + RECONNECT_MAX_MS;
   reconnectTimer = setInterval(async () => {
     if (!mainWindow) {
       clearReconnect();
@@ -203,6 +209,13 @@ function beginReconnect(): void {
     if (await isServerUp()) {
       clearReconnect();
       void mainWindow.loadURL(SERVER_URL);
+      return;
+    }
+    if (Date.now() >= deadline) {
+      // Server didn't come back — the user quit intentionally or it crashed.
+      // Close the Electron window so the app exits cleanly.
+      clearReconnect();
+      app.quit();
     }
   }, 1000);
 }

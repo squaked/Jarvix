@@ -21,9 +21,10 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin:${PA
 
 # ── 1. Stop any running Jarvix.app instance ───────────────────────────────────
 /usr/bin/pkill -f "Applications/Jarvix.app/Contents/MacOS/Jarvix" 2>/dev/null || true
-# Also kill old AppleScript applet instances (migration path)
+# Kill old AppleScript applet instances (migration path from pre-Electron builds)
 /usr/bin/pkill -f "Applications/Jarvix.app/Contents/MacOS/applet" 2>/dev/null || true
-/usr/bin/pkill -f "macos/launcher.sh" 2>/dev/null || true
+# Kill any launcher.sh tied to this install dir specifically
+/usr/bin/pkill -f "${INSTALL_DIR}/scripts/macos/launcher.sh" 2>/dev/null || true
 sleep 1
 
 # ── 2. Compile Electron main process (TypeScript → CommonJS) ──────────────────
@@ -42,6 +43,10 @@ else
 fi
 
 echo "    Packaging with electron-builder (${ARCH})..."
+
+# Remove stale output so the .app glob below always picks up this build,
+# not a leftover directory from a previous run with a different arch.
+rm -rf "$INSTALL_DIR/dist/electron-build"
 
 # CSC_IDENTITY_AUTO_DISCOVERY=false: prevent electron-builder from looking for
 # a code-signing certificate. We handle signing ourselves below.

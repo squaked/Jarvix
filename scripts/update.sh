@@ -71,9 +71,8 @@ log "Updates found — pulling and rebuilding..."
 # Save the current HEAD so we can roll back if the build fails.
 ROLLBACK_REV="$BEFORE"
 
-# Older installs created these via rebuild-app.sh before they lived in git. If they
-# are still untracked, `git pull` aborts with "would be overwritten by merge".
-# Same for the AppleScript bundle scripts (now path-independent and tracked).
+# Older installs may have untracked copies of these scripts. If they are still
+# untracked, `git pull` aborts with "would be overwritten by merge".
 for f in scripts/macos/launcher.sh scripts/macos/quit-server.sh; do
   if [ -f "$f" ] && ! git ls-files --error-unmatch "$f" >/dev/null 2>&1; then
     log "Removing untracked $f (blocks pull) — version from the repo will be used."
