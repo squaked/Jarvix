@@ -9,7 +9,7 @@
     "node": ">=18.17"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "sh -c 'P=$(tr -d \"[:space:]\" < scripts/jarvix.port 2>/dev/null || echo 47389); exec next dev -p \"$P\"'",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

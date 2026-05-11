@@ -7,9 +7,12 @@ INSTALL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$INSTALL_DIR"
 export JARVIX_INSTALL_DIR="$INSTALL_DIR"
 
-# If another process already owns port 3000, exit cleanly so the LaunchAgent
+# shellcheck source=load-jarvix-port.sh
+source "$INSTALL_DIR/scripts/load-jarvix-port.sh"
+
+# If another process already owns our port, exit cleanly so the LaunchAgent
 # does not spin in a rapid restart loop due to KeepAlive.
-if lsof -ti:3000 -sTCP:LISTEN >/dev/null 2>&1; then
+if lsof -ti:"$JARVIX_HTTP_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
   exit 0
 fi
 

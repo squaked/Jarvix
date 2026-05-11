@@ -15,16 +15,19 @@ mkdir -p "$LOG_DIR"
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin:${PATH:-}"
 export JARVIX_INSTALL_DIR="$INSTALL_DIR"
 
+# shellcheck source=load-jarvix-port.sh
+source "$INSTALL_DIR/scripts/load-jarvix-port.sh"
+
 echo "$(date): relaunch requested" >> "$LOG_DIR/relaunch.log"
 
-# Wait up to 10s for the previous server to release port 3000.
+# Wait up to 10s for the previous server to release our port.
 for _ in $(seq 1 20); do
-  /usr/sbin/lsof -ti:3000 -sTCP:LISTEN >/dev/null 2>&1 || break
+  /usr/sbin/lsof -ti:"$JARVIX_HTTP_PORT" -sTCP:LISTEN >/dev/null 2>&1 || break
   sleep 0.5
 done
 
 # If something is still bound, force-kill it so the new server can start.
-PID="$(/usr/sbin/lsof -ti:3000 -sTCP:LISTEN 2>/dev/null | head -1 || true)"
+PID="$(/usr/sbin/lsof -ti:"$JARVIX_HTTP_PORT" -sTCP:LISTEN 2>/dev/null | head -1 || true)"
 if [ -n "$PID" ]; then
   kill -TERM "$PID" 2>/dev/null || true
   sleep 1
@@ -43,7 +46,7 @@ disown || true
 # Wait up to 30s for the server to actually respond.
 for i in $(seq 1 30); do
   sleep 1
-  if /usr/bin/curl -fs --max-time 1 http://localhost:3000 >/dev/null 2>&1; then
+  if /usr/bin/curl -fs --max-time 1 "http://127.0.0.1:${JARVIX_HTTP_PORT}/" >/dev/null 2>&1; then
     echo "$(date): server is responding (pid=$SERVER_PID)" >> "$LOG_DIR/relaunch.log"
     exit 0
   fi

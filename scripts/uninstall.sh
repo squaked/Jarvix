@@ -18,8 +18,15 @@ launchctl unload "$UPDATER_PLIST" 2>/dev/null || true
 osascript -e 'tell application "Jarvix" to quit' 2>/dev/null || true
 sleep 1
 
-# 3. Belt-and-braces: kill anything still bound to port 3000.
-SERVER_PID="$(/usr/sbin/lsof -ti:3000 -sTCP:LISTEN 2>/dev/null | head -1 || true)"
+# 3. Belt-and-braces: kill anything still bound to the Jarvix HTTP port.
+if [ -f "$INSTALL_DIR/scripts/load-jarvix-port.sh" ]; then
+  # shellcheck source=load-jarvix-port.sh
+  source "$INSTALL_DIR/scripts/load-jarvix-port.sh"
+else
+  JARVIX_HTTP_PORT=47389
+  export JARVIX_HTTP_PORT
+fi
+SERVER_PID="$(/usr/sbin/lsof -ti:"$JARVIX_HTTP_PORT" -sTCP:LISTEN 2>/dev/null | head -1 || true)"
 if [ -n "$SERVER_PID" ]; then
   kill "$SERVER_PID" 2>/dev/null || true
   sleep 1

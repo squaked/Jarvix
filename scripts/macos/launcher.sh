@@ -12,10 +12,13 @@ INSTALL_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin"
 export JARVIX_INSTALL_DIR="$INSTALL_DIR"
 
+# shellcheck source=../load-jarvix-port.sh
+source "$INSTALL_DIR/scripts/load-jarvix-port.sh"
+
 LOG_DIR="$INSTALL_DIR/logs"
 mkdir -p "$LOG_DIR"
 
-if /usr/sbin/lsof -ti:3000 -sTCP:LISTEN >/dev/null 2>&1; then
+if /usr/sbin/lsof -ti:"$JARVIX_HTTP_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
   exit 0
 fi
 
@@ -29,7 +32,7 @@ disown || true
 # applet can open the browser as soon as it's ready.
 for _ in $(seq 1 30); do
   sleep 1
-  if /usr/bin/curl -fs --max-time 2 http://localhost:3000 >/dev/null 2>&1; then
+  if /usr/bin/curl -fs --max-time 2 "http://127.0.0.1:${JARVIX_HTTP_PORT}/" >/dev/null 2>&1; then
     exit 0
   fi
 done

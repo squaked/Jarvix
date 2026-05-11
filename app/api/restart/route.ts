@@ -17,7 +17,7 @@ export async function POST() {
   }
 
   // Spawn the detached relauncher BEFORE we exit. It waits for this
-  // process to release port 3000, then starts a fresh `npm start`.
+  // process to release the Jarvix HTTP port, then starts a fresh `npm start`.
   // Without this, the LaunchAgent (KeepAlive=false) and the Jarvix.app
   // launcher would both treat the exit as a final shutdown.
   let relauncherSpawned = false;
@@ -52,7 +52,7 @@ export async function POST() {
   }
 
   // Give in-flight requests time to flush, then exit so the new server
-  // can bind port 3000.
+  // can bind the Jarvix HTTP port.
   setTimeout(() => process.exit(0), 2000);
 
   return NextResponse.json({ restarting: true });

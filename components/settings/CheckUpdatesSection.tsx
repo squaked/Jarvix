@@ -110,7 +110,7 @@ export function CheckUpdatesSection() {
             {status === "idle" && "Jarvix checks automatically every 6 hours."}
             {status === "checking" && "Checking for updates…"}
             {status === "upToDate" && "Already up to date."}
-            {status === "building" && "Update found — building in the background. A banner will appear when ready."}
+            {status === "building" && "Update found — building in the background. The app will restart when ready."}
             {status === "ready" && "Update built and waiting — use the banner to restart."}
             {status === "error" && (errorMsg || "Check failed.")}
           </p>

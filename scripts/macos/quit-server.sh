@@ -1,20 +1,25 @@
 #!/bin/bash
 # Stops the Jarvix server: graceful /api/quit, then force-kill anything still
-# listening on port 3000, then unloads the LaunchAgent for this session so it
-# does not get respawned during the same login.
+# listening on the Jarvix HTTP port (see scripts/jarvix.port), then unloads the
+# LaunchAgent for this session so it does not get respawned during the same login.
 #
 # Called by Jarvix.app's `on quit` handler. Must always exit 0 so AppleScript
 # does not bail out before `continue quit`.
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin"
 
-/usr/bin/curl -s --max-time 3 -X POST http://localhost:3000/api/quit >/dev/null 2>&1 || true
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALL_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# shellcheck source=../load-jarvix-port.sh
+source "$INSTALL_DIR/scripts/load-jarvix-port.sh"
+
+/usr/bin/curl -s --max-time 3 -X POST "http://127.0.0.1:${JARVIX_HTTP_PORT}/api/quit" >/dev/null 2>&1 || true
 sleep 1
 
-for PID in $(/usr/sbin/lsof -ti:3000 -sTCP:LISTEN 2>/dev/null); do
+for PID in $(/usr/sbin/lsof -ti:"$JARVIX_HTTP_PORT" -sTCP:LISTEN 2>/dev/null); do
   kill "$PID" 2>/dev/null || true
 done
 sleep 1
-for PID in $(/usr/sbin/lsof -ti:3000 -sTCP:LISTEN 2>/dev/null); do
+for PID in $(/usr/sbin/lsof -ti:"$JARVIX_HTTP_PORT" -sTCP:LISTEN 2>/dev/null); do
   kill -9 "$PID" 2>/dev/null || true
 done
 

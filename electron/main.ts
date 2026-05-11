@@ -1,15 +1,37 @@
 import { app, BrowserWindow, Menu, shell } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
+import { spawn } from "child_process";
+import * as fs from "fs";
 import * as http from "http";
 import * as os from "os";
 import * as path from "path";
-import { spawn } from "child_process";
 
-const PORT = 3000;
-const SERVER_URL = `http://localhost:${PORT}`;
+/** Must stay in sync with `scripts/jarvix.port` default in `load-jarvix-port.sh`. */
+const DEFAULT_HTTP_PORT = 47389;
 
 let mainWindow: BrowserWindow | null = null;
 let reconnectTimer: ReturnType<typeof setInterval> | null = null;
+
+function installDir(): string {
+  return (
+    process.env.JARVIX_INSTALL_DIR ?? path.join(os.homedir(), ".jarvix-app")
+  );
+}
+
+function httpPort(): number {
+  const p = path.join(installDir(), "scripts", "jarvix.port");
+  try {
+    const raw = fs.readFileSync(p, "utf8").trim();
+    const n = parseInt(raw, 10);
+    if (Number.isFinite(n) && n >= 1024 && n <= 65535) return n;
+  } catch {
+    /* missing or unreadable */
+  }
+  return DEFAULT_HTTP_PORT;
+}
+
+const PORT = httpPort();
+const SERVER_URL = `http://127.0.0.1:${PORT}`;
 
 // ── Single instance ──────────────────────────────────────────────────────────
 const gotTheLock = app.requestSingleInstanceLock();
@@ -138,21 +160,11 @@ function createWindow(): void {
 }
 
 // ── Install dir + server spawning ────────────────────────────────────────────
-// Derived from env var set by LaunchAgent, falling back to the default install
-// path used by install.sh. Electron does not bundle the Next.js server — it
-// relies on it running as a LaunchAgent or starts it on demand here.
-function installDir(): string {
-  return (
-    process.env.JARVIX_INSTALL_DIR ??
-    path.join(os.homedir(), ".jarvix-app")
-  );
-}
-
 function ensureServerRunning(): void {
   const dir = installDir();
   const launcherScript = path.join(dir, "scripts", "macos", "launcher.sh");
   // launcher.sh is idempotent: it exits immediately if the server is already
-  // listening on port 3000, so it's safe to call unconditionally.
+  // listening on the Jarvix port, so it's safe to call unconditionally.
   const child = spawn("/bin/bash", [launcherScript], {
     detached: true,
     stdio: "ignore",
