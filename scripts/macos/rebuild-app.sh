@@ -34,14 +34,19 @@ npm run electron:compile --silent
 # Build for the current machine's architecture only — keeps first-install fast
 # (no universal fat binary needed for a personal-machine install).
 ARCH="$(uname -m)"
-[ "$ARCH" = "arm64" ] && EB_ARCH="arm64" || EB_ARCH="x64"
+# electron-builder v25+ does not accept `--arch`; use --arm64 or --x64 booleans.
+if [ "$ARCH" = "arm64" ]; then
+  EB_ARCH_FLAG=(--arm64)
+else
+  EB_ARCH_FLAG=(--x64)
+fi
 
-echo "    Packaging with electron-builder (arch: ${EB_ARCH})..."
+echo "    Packaging with electron-builder (${ARCH})..."
 
 # CSC_IDENTITY_AUTO_DISCOVERY=false: prevent electron-builder from looking for
 # a code-signing certificate. We handle signing ourselves below.
 CSC_IDENTITY_AUTO_DISCOVERY=false \
-  npx electron-builder --mac dir --arch "$EB_ARCH" 2>&1 | grep -v "^$" | sed 's/^/    /'
+  npx electron-builder --mac dir "${EB_ARCH_FLAG[@]}" 2>&1 | grep -v "^$" | sed 's/^/    /'
 
 # ── 4. Locate built .app and move to ~/Applications ───────────────────────────
 BUILT_APP="$(ls -d "$INSTALL_DIR/dist/electron-build"/*/Jarvix.app 2>/dev/null | head -1)"
