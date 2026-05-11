@@ -2,6 +2,9 @@
   "name": "jarvix",
   "version": "0.1.0",
   "private": true,
+  "description": "Jarvix — local-first AI assistant for macOS",
+  "author": "Jarvix",
+  "main": "electron-dist/main.js",
   "engines": {
     "node": ">=18.17"
   },

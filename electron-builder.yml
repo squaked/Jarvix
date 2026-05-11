@@ -2,8 +2,7 @@ appId: com.jarvix.app
 productName: Jarvix
 copyright: Jarvix
 
-# Entry point inside the packaged asar
-main: electron-dist/main.js
+# Electron entry point is package.json "main" (electron-builder v25+ rejects `main` here).
 
 # Include ONLY the compiled Electron main process — the Next.js server runs
 # separately as a LaunchAgent and is never bundled into the .app.
