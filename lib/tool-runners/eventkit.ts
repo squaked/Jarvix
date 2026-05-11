@@ -95,9 +95,10 @@ async function appleScriptFallbackForToday(explain: string): Promise<CalendarRea
     return {
       events,
       accessGranted: true,
-      hint: `${explain} Note: Accessed via Apple Calendar fallback.`,
+      hint: "Accessed via Apple Calendar fallback.",
     };
   }
+
   return {
     events: [],
     accessGranted: false,
@@ -118,9 +119,10 @@ async function appleScriptFallbackForRange(
     return {
       events,
       accessGranted: true,
-      hint: `${explain} Note: Accessed via Apple Calendar fallback.`,
+      hint: "Accessed via Apple Calendar fallback.",
     };
   }
+
   return {
     events: [],
     accessGranted: false,
