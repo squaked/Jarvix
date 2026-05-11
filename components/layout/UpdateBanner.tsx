@@ -9,7 +9,13 @@ import {
   jarvixUpdateFastPollRemainingMs,
 } from "@/lib/jarvix-update-poll";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 type Phase = "idle" | "ready" | "restarting" | "waiting";
 
@@ -37,8 +43,13 @@ export function UpdateBanner() {
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
   const mountedRef = useRef(true);
+  /** Set synchronously on "Restart to apply" before React re-renders. POST /api/restart deletes `.update-ready` immediately, so the next poll would otherwise see `ready: false` and dismiss the banner while phaseRef is still "ready". */
+  const restartFlowRef = useRef(false);
 
   const checkForUpdate = useCallback(async () => {
+    if (restartFlowRef.current) {
+      return;
+    }
     // Mid-restart: wait for restart flow — don't flicker banner state.
     if (
       phaseRef.current === "restarting" ||
@@ -124,13 +135,22 @@ export function UpdateBanner() {
     void checkForUpdate();
   }, [pathname, checkForUpdate]);
 
+  // Once "restarting" / "waiting" has committed, polls can use phaseRef again.
+  useLayoutEffect(() => {
+    if (phase === "restarting" || phase === "waiting") {
+      restartFlowRef.current = false;
+    }
+  }, [phase]);
+
   const handleRestart = useCallback(async () => {
+    restartFlowRef.current = true;
     setPhase("restarting");
     try {
       const res = await fetch("/api/restart", { method: "POST" });
       // If the relauncher failed to spawn, the server stays alive and returns
       // a 500 with an error message. Show "ready" again so the user can retry.
       if (!res.ok) {
+        restartFlowRef.current = false;
         setPhase("ready");
         return;
       }
@@ -165,7 +185,10 @@ export function UpdateBanner() {
         })
         .catch(() => {
           if (Date.now() - startedAt > RESTART_GRACE_MS) {
-            if (mountedRef.current) setPhase("ready");
+            if (mountedRef.current) {
+              restartFlowRef.current = false;
+              setPhase("ready");
+            }
             return;
           }
           setTimeout(poll, RESTART_POLL_MS);
