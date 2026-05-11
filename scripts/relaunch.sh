@@ -9,6 +9,7 @@ set -euo pipefail
 INSTALL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LOG_DIR="$INSTALL_DIR/logs"
 mkdir -p "$LOG_DIR"
+/bin/bash "$INSTALL_DIR/scripts/reset-session-logs.sh"
 
 # Make sure brew/node are reachable when launched detached from the server.
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin:${PATH:-}"

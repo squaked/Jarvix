@@ -18,21 +18,9 @@ const HELPER_REL_PATH =
   "scripts/macos/JarvixEventKitHelper/JarvixEventKitHelper.app/Contents/MacOS/JarvixEventKitHelper";
 
 /**
- * Locate the Jarvix EventKit helper binary.
- *
- * Search order:
- *   1. $JARVIX_EVENTKIT_HELPER  — explicit override pointing at the binary.
- *   2. $JARVIX_INSTALL_DIR      — set by launcher.sh / the LaunchAgent.
- *   3. process.cwd()            — works when the server is started from the
- *                                 install dir (npm run dev / npm start).
- *   4. The repo root inferred from this module's path. Survives `cd`-ing into
- *      any subdirectory before launching node.
- *
- * Using $JARVIX_INSTALL_DIR first is important: when npm is launched from a
- * different cwd (e.g. via Cursor's task runner), process.cwd() can resolve to
- * an unrelated path, the helper is "not found", and the code silently falls
- * back to eventkit-node — which is attributed to a different macOS TCC bucket,
- * making the "calendar shows as allowed but doesn't work" bug.
+ * Resolve the EventKit helper binary: env override, then $JARVIX_INSTALL_DIR,
+ * then cwd, then walking up from this module (so TCC + paths work even when
+ * npm's cwd is wrong).
  */
 export function resolveEventKitHelperExecutable(): string | null {
   const candidates: string[] = [];
@@ -45,8 +33,7 @@ export function resolveEventKitHelperExecutable(): string | null {
 
   candidates.push(path.join(process.cwd(), HELPER_REL_PATH));
 
-  // __dirname is something like <root>/lib (or .next/server/...) at runtime.
-  // Walk up to find a directory that contains the helper.
+  // Built server chunk lives under .next/server; walk up to find repo root.
   let dir = __dirname;
   for (let i = 0; i < 6; i++) {
     candidates.push(path.join(dir, HELPER_REL_PATH));

@@ -37,6 +37,10 @@ if ! mkdir "$LOCK_DIR" 2>/dev/null; then
 fi
 trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
 
+# One update run → one update.log (LaunchAgent + UI checks otherwise append forever).
+mkdir -p "$INSTALL_DIR/logs"
+: > "$INSTALL_DIR/logs/update.log"
+
 # Make sure we have git/node on PATH when launched from launchd.
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin:${PATH:-}"
 

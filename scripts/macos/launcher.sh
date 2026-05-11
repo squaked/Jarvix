@@ -19,6 +19,8 @@ if /usr/sbin/lsof -ti:3000 -sTCP:LISTEN >/dev/null 2>&1; then
   exit 0
 fi
 
+/bin/bash "$INSTALL_DIR/scripts/reset-session-logs.sh"
+
 cd "$INSTALL_DIR" || exit 1
 nohup npm start >> "$LOG_DIR/server.log" 2>&1 &
 disown || true

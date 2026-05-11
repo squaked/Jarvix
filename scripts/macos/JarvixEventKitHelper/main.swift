@@ -3,24 +3,10 @@ import EventKit
 import Foundation
 
 // MARK: - TCC responsibility disclaim
-//
-// When the helper is spawned directly by Node (`child_process.spawn`), macOS
-// TCC walks the responsibility chain *up* to the parent process to decide who
-// is asking for calendar access. That ends up being whatever launched node
-// (the AppleScript applet, Cursor, Terminal, …) — not this binary — so the
-// "Jarvix" toggle the user enabled under Privacy → Calendars (which is bound
-// to `ai.jarvix.eventkit-helper`) is ignored and the helper sees
-// `notDetermined`.
-//
-// The fix is to disclaim parent responsibility before doing any EventKit work,
-// so this process becomes its own responsible app and TCC keys lookups on the
-// helper's own bundle id + CDHash. We do this by re-exec'ing ourselves with
-// the private `responsibility_spawnattrs_setdisclaim` posix_spawn attribute
-// (available since macOS 10.14, used by Apple and many shipping apps for
-// exactly this purpose).
-//
-// Pattern adapted from Apple/Qt's well-known recipe; uses POSIX_SPAWN_SETEXEC
-// so we don't fork — same PID, new responsibility.
+// Node spawns this helper via posix_spawn; TCC then attributes calendar access
+// to the parent (applet/Terminal/Cursor), not this bundle. Re-exec once with
+// responsibility_spawnattrs_setdisclaim (POSIX_SPAWN_SETEXEC, macOS 10.14+)
+// so this process is its own responsible app for Privacy → Calendars.
 
 @_silgen_name("responsibility_spawnattrs_setdisclaim")
 private func responsibility_spawnattrs_setdisclaim(

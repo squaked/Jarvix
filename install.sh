@@ -186,6 +186,7 @@ mkdir -p "$HOME/Applications"
 # Info.plist keys, codesign). install.sh just kicks it off.
 chmod +x "$INSTALL_DIR/scripts/macos/rebuild-app.sh"
 chmod +x "$INSTALL_DIR/scripts/macos/launcher.sh" "$INSTALL_DIR/scripts/macos/quit-server.sh"
+chmod +x "$INSTALL_DIR/scripts/reset-session-logs.sh"
 /bin/bash "$INSTALL_DIR/scripts/macos/rebuild-app.sh" | sed 's/^/    /'
 ok "Jarvix.app created in ~/Applications"
 

@@ -22,6 +22,7 @@ fi
 # Check for updates in the background so startup is not delayed.
 LOG_DIR="$INSTALL_DIR/logs"
 mkdir -p "$LOG_DIR"
+/bin/bash "$INSTALL_DIR/scripts/reset-session-logs.sh"
 UPDATE_LOG="$LOG_DIR/update.log"
 bash "$INSTALL_DIR/scripts/update.sh" >> "$UPDATE_LOG" 2>&1 &
 
