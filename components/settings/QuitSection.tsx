@@ -30,7 +30,7 @@ export function QuitSection() {
           <p className="mt-0.5 text-sm text-muted">
             {quit
               ? "Jarvix has stopped. To reopen, click Jarvix in your Dock or Applications folder."
-              : "Stops the server and removes Jarvix from the Dock."}
+              : "Stops the app."}
           </p>
         </div>
 

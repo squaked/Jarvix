@@ -2,7 +2,8 @@
 # scripts/update.sh
 #
 # Triggered by:
-#   • the com.jarvix.updater LaunchAgent (every 6 hours), and
+#   • the com.jarvix.updater LaunchAgent (every 6 hours),
+#   • server startup (scripts/start-server.sh), and
 #   • the in-app "Check for updates" button (POST /api/check-updates).
 #
 # Pulls latest code and rebuilds only when there are actual changes.
