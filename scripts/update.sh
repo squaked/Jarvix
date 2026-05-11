@@ -76,10 +76,14 @@ for f in scripts/macos/launcher.sh scripts/macos/quit-server.sh; do
   fi
 done
 
-# Refuse to clobber local edits — surface this clearly in the log.
+# Prefer a fast-forward; if that fails (local edits, divergent branch), match
+# origin/main exactly — this install is treated as an app bundle, not a dev fork.
 if ! git pull --ff-only 2>&1; then
-  log "git pull --ff-only failed (local changes or non-FF history). Aborting."
-  exit 1
+  log "Fast-forward pull failed — syncing checkout to origin/main (discards local edits)."
+  if ! git fetch origin || ! git reset --hard origin/main; then
+    log "Could not sync with origin/main. Aborting."
+    exit 1
+  fi
 fi
 
 # Only reinstall deps if package-lock.json or package.json changed.

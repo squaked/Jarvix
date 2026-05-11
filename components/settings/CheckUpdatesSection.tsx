@@ -74,9 +74,11 @@ export function CheckUpdatesSection() {
             kickJarvixUpdateBannerStatus();
             setStatus("ready");
           } else if (!data.building) {
-            // Lock disappeared but no ready marker — build must have failed.
+            // Lock disappeared but no ready marker — pull or build failed; see update.log.
             clearJarvixUpdateFastPollWindow();
-            setErrorMsg("Build failed. Check logs/update.log for details.");
+            setErrorMsg(
+              "Update did not finish (git sync or build failed). See logs/update.log in your Jarvix install folder.",
+            );
             setStatus("error");
           }
         })
