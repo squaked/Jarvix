@@ -94,14 +94,40 @@ async function appleScriptFallbackForToday(explain: string): Promise<CalendarRea
   if (events.length > 0) {
     return {
       events,
-      hint: `${explain} Some events may still appear using Apple Calendar.`,
+      accessGranted: true,
+      hint: `${explain} Note: Accessed via Apple Calendar fallback.`,
     };
   }
   return {
     events: [],
+    accessGranted: false,
     hint: `${explain} ${calendarPermissionHint} Then try again.`,
   };
 }
+
+async function appleScriptFallbackForRange(
+  explain: string,
+  start: Date,
+  end: Date,
+): Promise<CalendarReadResult> {
+  const { calendarEventsRangeAppleScript } = await import(
+    "./calendar-applescript"
+  );
+  const events = await calendarEventsRangeAppleScript(start, end);
+  if (events.length > 0) {
+    return {
+      events,
+      accessGranted: true,
+      hint: `${explain} Note: Accessed via Apple Calendar fallback.`,
+    };
+  }
+  return {
+    events: [],
+    accessGranted: false,
+    hint: `${explain} ${calendarPermissionHint} Then try again.`,
+  };
+}
+
 
 export async function getCalendarEventsTodayWithHint(): Promise<CalendarReadResult> {
   if (await eventKitHelperUsable()) {
@@ -187,10 +213,11 @@ export async function getCalendarEventsRangeWithHint(
       await helperRequestAccess();
       const status = await helperAuthStatus();
       if (!calendarReadAllowed(status)) {
-        return {
-          events: [],
-          hint: `Calendar access isn’t allowed yet (${status}). ${calendarPermissionHint}`,
-        };
+        return appleScriptFallbackForRange(
+          `Calendar access isn’t allowed yet (${status}).`,
+          rangeStart,
+          rangeEnd,
+        );
       }
       const events = await helperEventsInRange(rangeStart, rangeEnd);
       return { events, accessGranted: true };
@@ -201,20 +228,23 @@ export async function getCalendarEventsRangeWithHint(
 
   const ek = await loadEventKit();
   if (!ek) {
-    return {
-      events: [],
-      hint: `${calendarPermissionHint} Date-range reads need EventKit; module failed to load.`,
-    };
+    return appleScriptFallbackForRange(
+      "Native EventKit module did not load (wrong OS/architecture or addon missing).",
+      rangeStart,
+      rangeEnd,
+    );
   }
 
   const canRead = await ensureCalendarReadAccess(ek);
   if (!canRead) {
     const status = safeAuthEvent(ek);
-    return {
-      events: [],
-      hint: `EventKit range read denied (${status}). ${calendarPermissionHint}`,
-    };
+    return appleScriptFallbackForRange(
+      `EventKit range read denied (${status}).`,
+      rangeStart,
+      rangeEnd,
+    );
   }
+
 
   const pred = ek.createEventPredicate(rangeStart, rangeEnd);
   const events = ek.getEventsWithPredicate(pred).map(serializeEvent);

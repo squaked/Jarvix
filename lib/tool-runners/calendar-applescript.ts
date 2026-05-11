@@ -7,12 +7,16 @@ const execFileAsync = promisify(execFile);
 
 /**
  * Fallback when native EventKit is unavailable or declined.
- * May prompt Automation for Calendar.app (separate from EventKit in Privacy).
+ * Supports date range.
  */
-export async function calendarEventsTodayAppleScript(): Promise<
-  CalendarEventBrief[]
-> {
+export async function calendarEventsRangeAppleScript(
+  start: Date,
+  end: Date,
+): Promise<CalendarEventBrief[]> {
   if (process.platform !== "darwin") return [];
+
+  const startSecs = Math.floor(start.getTime() / 1000);
+  const endSecs = Math.floor(end.getTime() / 1000);
 
   const script = `
 on pad2(n as integer)
@@ -39,13 +43,15 @@ end isoFromDate
 on run
 	set delim to ASCII character 31
 	set outText to ""
-	set todayStart to current date
-	set time of todayStart to 0
-	set todayEnd to todayStart + (1 * days)
+	
+	-- Hack to set dates from unix timestamps in AppleScript
+	set rangeStart to (POSIX date 0) + ${startSecs}
+	set rangeEnd to (POSIX date 0) + ${endSecs}
+
 	tell application "Calendar"
 		repeat with acal in calendars
 			try
-				repeat with ev in (every event of acal whose start date is greater than or equal to todayStart and start date is less than todayEnd)
+				repeat with ev in (every event of acal whose start date is greater than or equal to rangeStart and start date is less than rangeEnd)
 					set t to ""
 					try
 						set t to summary of ev
@@ -100,4 +106,18 @@ end run
   } catch {
     return [];
   }
+}
+
+/**
+ * Fallback when native EventKit is unavailable or declined.
+ * May prompt Automation for Calendar.app (separate from EventKit in Privacy).
+ */
+export async function calendarEventsTodayAppleScript(): Promise<
+  CalendarEventBrief[]
+> {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setHours(24, 0, 0, 0);
+  return calendarEventsRangeAppleScript(start, end);
 }
