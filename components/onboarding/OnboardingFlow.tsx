@@ -1,6 +1,8 @@
 "use client";
 
+import { MicrophoneIcon } from "@/components/icons/MicrophoneIcon";
 import { AgentPersonalizationFields } from "@/components/settings/AgentPersonalizationFields";
+
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { DEFAULT_AGENT_PERSONALIZATION } from "@/lib/agent-personalization";
