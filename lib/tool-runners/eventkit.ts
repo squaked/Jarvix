@@ -20,7 +20,7 @@ export type CalendarReadResult = {
   hint?: string;
   /**
    * True when EventKit accepted the read (including empty calendars).
-   * Helps the model distinguish “no events today” from “permission denied”.
+   * Helps the model distinguish "no events today" from "permission denied".
    */
   accessGranted?: boolean;
 };
@@ -76,8 +76,8 @@ async function ensureCalendarWriteAccess(ek: LoadedEK): Promise<boolean> {
 }
 
 /**
- * Prefer the small Jarvix helper app when present so macOS Privacy shows “Jarvix” correctly.
- * Builds the helper once on macOS if it’s missing (needs Xcode Command Line Tools).
+ * Prefer the small Jarvix helper app when present so macOS Privacy shows "Jarvix" correctly.
+ * Builds the helper once on macOS if it's missing (needs Xcode Command Line Tools).
  */
 async function eventKitHelperUsable(): Promise<boolean> {
   if (process.env.JARVIX_EVENTKIT_HELPER === "0") return false;
@@ -85,8 +85,22 @@ async function eventKitHelperUsable(): Promise<boolean> {
   return isEventKitHelperInstalled();
 }
 
+/**
+ * Check status via the helper, requesting access only when not yet determined.
+ * Avoids calling requestFullAccessToEvents when already authorized — that call
+ * can silently return wrong results when the server is spawned via do shell script
+ * (AppleScript → bash → npm → node), even though the TCC permission is granted.
+ */
+async function helperEnsureAndGetStatus(): Promise<string> {
+  const status = await helperAuthStatus();
+  if (isCalendarReadAllowedStatus(status)) return status;
+  // Only prompt when not yet authorized.
+  const { status: after } = await helperRequestAccess();
+  return after;
+}
+
 const calendarPermissionHint =
-  "On your Mac: System Settings → Privacy & Security → Calendars. Turn on Jarvix if it’s listed, or the program that runs your Jarvix server (often Cursor, Terminal, or Node)—the chat is in the browser, but permission is for that Mac program.";
+  "On your Mac: System Settings → Privacy & Security → Calendars. Turn on Jarvix if it's listed, or the program that runs your Jarvix server (often Cursor, Terminal, or Node)—the chat is in the browser, but permission is for that Mac program.";
 
 async function appleScriptFallbackForToday(explain: string): Promise<CalendarReadResult> {
   const { calendarEventsTodayAppleScript } = await import(
@@ -142,8 +156,7 @@ async function appleScriptFallbackForRange(
 export async function getCalendarEventsTodayWithHint(): Promise<CalendarReadResult> {
   if (await eventKitHelperUsable()) {
     try {
-      await helperRequestAccess();
-      const status = await helperAuthStatus();
+      const status = await helperEnsureAndGetStatus();
       if (isCalendarReadAllowedStatus(status)) {
         const start = new Date();
         start.setHours(0, 0, 0, 0);
@@ -152,7 +165,7 @@ export async function getCalendarEventsTodayWithHint(): Promise<CalendarReadResu
         const events = await helperEventsInRange(start, end);
         return { events, accessGranted: true };
       }
-      /* Helper exists but isn’t allowed — try eventkit-node (e.g. user enabled Cursor only). */
+      /* Helper exists but isn't allowed — try eventkit-node (e.g. user enabled Cursor only). */
     } catch {
       /* fall through to eventkit-node / AppleScript */
     }
@@ -218,8 +231,7 @@ export async function getCalendarEventsRangeWithHint(
 
   if (await eventKitHelperUsable()) {
     try {
-      await helperRequestAccess();
-      const status = await helperAuthStatus();
+      const status = await helperEnsureAndGetStatus();
       if (isCalendarReadAllowedStatus(status)) {
         const events = await helperEventsInRange(rangeStart, rangeEnd);
         return { events, accessGranted: true };
@@ -270,8 +282,7 @@ export async function calendarCreateEvent(input: {
 }): Promise<{ id: string }> {
   if (await eventKitHelperUsable()) {
     try {
-      await helperRequestAccess();
-      const status = await helperAuthStatus();
+      const status = await helperEnsureAndGetStatus();
       if (!calendarWriteAllowed(status)) {
         throw new Error(`Calendar access denied (${status}).`);
       }
@@ -339,7 +350,7 @@ export async function requestCalendarAccessAttempt(): Promise<{
   eventkitAvailable: boolean;
   accessGranted: boolean;
   status: string;
-  /** True when the Jarvix helper app exists — that’s what shows up as “Jarvix” in Privacy. */
+  /** True when the Jarvix helper app exists — that's what shows up as "Jarvix" in Privacy. */
   jarvixHelperReady: boolean;
 }> {
   if (await eventKitHelperUsable()) {
