@@ -8,8 +8,8 @@ export type ProviderProfile = {
   model: string;
 };
 
-/** Unified voice: conversation style + personality in one choice */
-export type AgentVoicePreset =
+/** Unified personality: conversation style + tone in one choice */
+export type AgentPersonalityPreset =
   | "balanced"
   | "warm"
   | "professional"
@@ -19,9 +19,9 @@ export type AgentVoicePreset =
 export type AgentPersonalization = {
   /** Optional name or nickname Jarvix may use when addressing the user */
   displayName: string;
-  voicePreset: AgentVoicePreset;
-  /** Only when voicePreset is custom — character/voice guidance only */
-  voiceCustom: string;
+  personalityPreset: AgentPersonalityPreset;
+  /** Only when personalityPreset is custom — character/personality guidance only */
+  personalityCustom: string;
 };
 
 /** Groq Orpheus English TTS voice IDs (canopylabs/orpheus-v1-english). */

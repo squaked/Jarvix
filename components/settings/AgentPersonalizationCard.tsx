@@ -33,8 +33,8 @@ export function AgentPersonalizationCard({ onSaved }: Props) {
 
   const dirty =
     draft.displayName !== settings.agent.displayName ||
-    draft.voicePreset !== settings.agent.voicePreset ||
-    draft.voiceCustom !== settings.agent.voiceCustom;
+    draft.personalityPreset !== settings.agent.personalityPreset ||
+    draft.personalityCustom !== settings.agent.personalityCustom;
 
   return (
     <Card className="space-y-6 p-6 sm:p-8">

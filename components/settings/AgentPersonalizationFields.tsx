@@ -3,11 +3,11 @@
 import { Input } from "@/components/ui/Input";
 import {
   DISPLAY_NAME_MAX,
-  VOICE_CUSTOM_MAX,
+  PERSONALITY_CUSTOM_MAX,
 } from "@/lib/agent-personalization";
-import type { AgentPersonalization, AgentVoicePreset } from "@/lib/types";
+import type { AgentPersonalization, AgentPersonalityPreset } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { VoicePresetCards } from "./VoicePresetCards";
+import { PersonalityPresetCards } from "./PersonalityPresetCards";
 
 type Props = {
   value: AgentPersonalization;
@@ -23,8 +23,8 @@ export function AgentPersonalizationFields({
   disabled = false,
   hideDisplayName = false,
 }: Props) {
-  const setVoicePreset = (voicePreset: AgentVoicePreset) =>
-    onChange({ ...value, voicePreset });
+  const setPersonalityPreset = (personalityPreset: AgentPersonalityPreset) =>
+    onChange({ ...value, personalityPreset });
 
   return (
     <div className="space-y-6">
@@ -53,32 +53,32 @@ export function AgentPersonalizationFields({
       <div className="space-y-3">
         <div className="space-y-2">
           <label className="block text-sm font-medium text-text">
-            Voice &amp; personality
+            Personality &amp; tone
           </label>
-          <VoicePresetCards
-            value={value.voicePreset}
-            onChange={setVoicePreset}
+          <PersonalityPresetCards
+            value={value.personalityPreset}
+            onChange={setPersonalityPreset}
             disabled={disabled}
           />
         </div>
 
-        {value.voicePreset === "custom" ? (
+        {value.personalityPreset === "custom" ? (
           <div className="space-y-2 pt-1">
             <label
-              htmlFor="agent-voice-custom"
+              htmlFor="agent-personality-custom"
               className="block text-sm font-medium text-text"
             >
-              Custom voice
+              Custom personality
             </label>
             <textarea
-              id="agent-voice-custom"
-              value={value.voiceCustom}
-              maxLength={VOICE_CUSTOM_MAX}
+              id="agent-personality-custom"
+              value={value.personalityCustom}
+              maxLength={PERSONALITY_CUSTOM_MAX}
               rows={4}
               disabled={disabled}
               placeholder="e.g. Dry understatement; treats complexity like a puzzle; never sarcastic about you."
               onChange={(e) =>
-                onChange({ ...value, voiceCustom: e.target.value })
+                onChange({ ...value, personalityCustom: e.target.value })
               }
               className={cn(
                 "min-h-[104px] w-full resize-y rounded-2xl border border-border bg-surface-2 px-4 py-2.5 text-sm text-text shadow-soft placeholder:text-muted",

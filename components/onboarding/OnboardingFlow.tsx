@@ -1,6 +1,5 @@
 "use client";
 
-import { MicrophoneIcon } from "@/components/icons/MicrophoneIcon";
 import { AgentPersonalizationFields } from "@/components/settings/AgentPersonalizationFields";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -9,21 +8,23 @@ import { PROVIDER_LABEL, PROVIDER_KEY_URL } from "@/lib/provider-options";
 import { DEFAULT_JARVIX_SETTINGS } from "@/lib/settings-defaults";
 import { mergeProfileRecords } from "@/lib/settings-merge";
 import { useJarvixSettings } from "@/lib/settings";
-import type { AgentPersonalization } from "@/lib/types";
+import type { AgentPersonalization, TtsVoiceId } from "@/lib/types";
 import { verifyProviderKey } from "@/lib/verify-provider-key";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ApiKeyInput } from "./ApiKeyInput";
+import { TtsVoiceSelection } from "./TtsVoiceSelection";
 
 const STEPS = [
-  { id: "welcome",   label: "Welcome" },
-  { id: "name",      label: "About you" },
-  { id: "voice",     label: "Voice" },
-  { id: "weather",   label: "Weather" },
-  { id: "calendar",  label: "Calendar" },
-  { id: "dock",     label: "Dock" },
-  { id: "key",       label: "Connect" },
+  { id: "welcome",     label: "Welcome" },
+  { id: "name",        label: "About you" },
+  { id: "personality", label: "Personality" },
+  { id: "voice",       label: "Voice" },
+  { id: "weather",     label: "Weather" },
+  { id: "calendar",    label: "Calendar" },
+  { id: "dock",        label: "Dock" },
+  { id: "key",         label: "Connect" },
 ] as const;
 
 type StepId = (typeof STEPS)[number]["id"];
@@ -57,6 +58,9 @@ export default function OnboardingFlow() {
   const [agentDraft, setAgentDraft] = useState<AgentPersonalization>(
     DEFAULT_AGENT_PERSONALIZATION,
   );
+  const [ttsVoiceDraft, setTtsVoiceDraft] = useState<TtsVoiceId>(
+    DEFAULT_JARVIX_SETTINGS.tts.voice,
+  );
   const [weatherLocationDraft, setWeatherLocationDraft] = useState(
     DEFAULT_JARVIX_SETTINGS.weatherLocation,
   );
@@ -71,6 +75,7 @@ export default function OnboardingFlow() {
     const pr = settings.profiles.groq;
     setApiKey(pr.apiKey);
     setAgentDraft(settings.agent);
+    setTtsVoiceDraft(settings.tts.voice);
     setWeatherLocationDraft(settings.weatherLocation);
   }, [bootstrapped, settings]);
 
@@ -148,6 +153,10 @@ export default function OnboardingFlow() {
         profiles: mergeProfileRecords(settings.profiles, {
           groq: { apiKey },
         }),
+        tts: {
+          ...settings.tts,
+          voice: ttsVoiceDraft,
+        },
       });
       router.replace("/");
     } finally {
@@ -308,6 +317,31 @@ export default function OnboardingFlow() {
             </motion.div>
           )}
 
+          {stepId === "personality" && (
+            <motion.div key="personality" {...slide} className="flex flex-col gap-6 p-8">
+              <BackLink onBack={goBack} />
+              <div>
+                <h2
+                  className="font-display text-2xl font-medium text-text"
+                  style={{ fontVariationSettings: '"opsz" 28' }}
+                >
+                  Personality &amp; tone
+                </h2>
+                <p className="mt-1 text-sm text-muted">
+                  How should Jarvix act when you talk to it?
+                </p>
+              </div>
+              <AgentPersonalizationFields
+                value={agentDraft}
+                onChange={setAgentDraft}
+                hideDisplayName
+              />
+              <Button type="button" className="w-full" onClick={goNext}>
+                Continue
+              </Button>
+            </motion.div>
+          )}
+
           {stepId === "voice" && (
             <motion.div key="voice" {...slide} className="flex flex-col gap-6 p-8">
               <BackLink onBack={goBack} />
@@ -322,10 +356,9 @@ export default function OnboardingFlow() {
                   How should Jarvix sound when it talks back?
                 </p>
               </div>
-              <AgentPersonalizationFields
-                value={agentDraft}
-                onChange={setAgentDraft}
-                hideDisplayName
+              <TtsVoiceSelection
+                value={ttsVoiceDraft}
+                onChange={setTtsVoiceDraft}
               />
               <Button type="button" className="w-full" onClick={goNext}>
                 Continue

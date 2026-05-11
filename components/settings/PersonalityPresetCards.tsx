@@ -1,17 +1,17 @@
 "use client";
 
-import { AGENT_VOICE_OPTIONS } from "@/lib/agent-personalization";
-import type { AgentVoicePreset } from "@/lib/types";
+import { AGENT_PERSONALITY_OPTIONS } from "@/lib/agent-personalization";
+import type { AgentPersonalityPreset } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type Props = {
-  value: AgentVoicePreset;
-  onChange: (next: AgentVoicePreset) => void;
+  value: AgentPersonalityPreset;
+  onChange: (next: AgentPersonalityPreset) => void;
   disabled?: boolean;
 };
 
-/** Concise, human, and concrete — what the user can actually expect to hear. */
-const VOICE_TASTE: Record<AgentVoicePreset, { headline: string; example: string }> = {
+/** Concise, human, and concrete — what the user can actually expect. */
+const PERSONALITY_TASTE: Record<AgentPersonalityPreset, { headline: string; example: string }> = {
   balanced: {
     headline: "A friendly co-pilot.",
     example: "“Sure — I’ll grab the answer and keep it short.”",
@@ -26,19 +26,19 @@ const VOICE_TASTE: Record<AgentVoicePreset, { headline: string; example: string 
   },
   custom: {
     headline: "Write your own.",
-    example: "Describe how Jarvix should sound in your own words.",
+    example: "Describe how Jarvix should act in your own words.",
   },
 };
 
-export function VoicePresetCards({ value, onChange, disabled }: Props) {
+export function PersonalityPresetCards({ value, onChange, disabled }: Props) {
   return (
     <div
       role="radiogroup"
-      aria-label="Voice & personality"
+      aria-label="Personality & tone"
       className="grid grid-cols-1 gap-2 sm:grid-cols-2"
     >
-      {AGENT_VOICE_OPTIONS.map((opt) => {
-        const taste = VOICE_TASTE[opt.id];
+      {AGENT_PERSONALITY_OPTIONS.map((opt) => {
+        const taste = PERSONALITY_TASTE[opt.id];
         const selected = value === opt.id;
         return (
           <button

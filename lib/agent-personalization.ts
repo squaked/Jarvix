@@ -1,27 +1,27 @@
-import type { AgentPersonalization, AgentVoicePreset } from "./types";
+import type { AgentPersonalization, AgentPersonalityPreset } from "./types";
 
 export const DISPLAY_NAME_MAX = 64;
-export const VOICE_CUSTOM_MAX = 500;
+export const PERSONALITY_CUSTOM_MAX = 500;
 
 export const DEFAULT_AGENT_PERSONALIZATION: AgentPersonalization = {
   displayName: "",
-  voicePreset: "balanced",
-  voiceCustom: "",
+  personalityPreset: "balanced",
+  personalityCustom: "",
 };
 
 /** Stored presets + custom */
-export const AGENT_VOICE_PRESETS = [
+export const AGENT_PERSONALITY_PRESETS = [
   "balanced",
   "warm",
   "professional",
   "custom",
-] as const satisfies readonly AgentVoicePreset[];
+] as const satisfies readonly AgentPersonalityPreset[];
 
-const VALID_VOICES_SET = new Set<string>(AGENT_VOICE_PRESETS);
+const VALID_PERSONALITIES_SET = new Set<string>(AGENT_PERSONALITY_PRESETS);
 
 /** Labels only — shown in onboarding / Settings */
-export const AGENT_VOICE_OPTIONS: readonly {
-  id: AgentVoicePreset;
+export const AGENT_PERSONALITY_OPTIONS: readonly {
+  id: AgentPersonalityPreset;
   label: string;
 }[] = [
   { id: "balanced", label: "Balanced" },
@@ -30,7 +30,7 @@ export const AGENT_VOICE_OPTIONS: readonly {
   { id: "custom", label: "Custom" },
 ];
 
-const VOICE_PROMPTS: Record<Exclude<AgentVoicePreset, "custom">, string> = {
+const PERSONALITY_PROMPTS: Record<Exclude<AgentPersonalityPreset, "custom">, string> = {
   balanced:
     "Balanced copilot — warm and efficient; light wit only when it fits (never smarmy).",
   warm:
@@ -40,15 +40,15 @@ const VOICE_PROMPTS: Record<Exclude<AgentVoicePreset, "custom">, string> = {
 };
 
 /** Older installs may reference dropped presets — coerce into current four (+ custom handled separately). */
-const LEGACY_VOICE_TO_CURRENT: Record<string, AgentVoicePreset> = {
+const LEGACY_PERSONALITY_TO_CURRENT: Record<string, AgentPersonalityPreset> = {
   trusted_operator: "balanced",
   laconic: "balanced",
   playful: "warm",
   enthusiast: "warm",
 };
 
-/** Legacy settings stored tone separately (pre-unified voice). */
-const LEGACY_TONE_MAP: Record<string, AgentVoicePreset> = {
+/** Legacy settings stored tone separately (pre-unified personality). */
+const LEGACY_TONE_MAP: Record<string, AgentPersonalityPreset> = {
   balanced: "balanced",
   warm: "warm",
   concise: "balanced",
@@ -56,11 +56,11 @@ const LEGACY_TONE_MAP: Record<string, AgentVoicePreset> = {
   playful: "warm",
 };
 
-function coerceVoicePreset(raw: string): AgentVoicePreset | undefined {
-  if (VALID_VOICES_SET.has(raw)) {
-    return raw as AgentVoicePreset;
+function coercePersonalityPreset(raw: string): AgentPersonalityPreset | undefined {
+  if (VALID_PERSONALITIES_SET.has(raw)) {
+    return raw as AgentPersonalityPreset;
   }
-  return LEGACY_VOICE_TO_CURRENT[raw];
+  return LEGACY_PERSONALITY_TO_CURRENT[raw];
 }
 
 function stripControls(s: string): string {
@@ -84,26 +84,27 @@ export function normalizeAgentPersonalization(raw: unknown): AgentPersonalizatio
   const displayName = sanitizeSingleLine(rawRecord.displayName, DISPLAY_NAME_MAX);
 
   const customFromSources = sanitizeMultiLine(
-    rawRecord.voiceCustom ??
-      rawRecord.personalityCustom ??
+    rawRecord.personalityCustom ??
+      rawRecord.voiceCustom ??
       rawRecord.extraInstructions,
-    VOICE_CUSTOM_MAX,
+    PERSONALITY_CUSTOM_MAX,
   );
 
-  const hasVoicePresetKey = "voicePreset" in rawRecord;
+  const hasPersonalityPresetKey = "personalityPreset" in rawRecord || "voicePreset" in rawRecord;
+  const rawPreset = (rawRecord.personalityPreset ?? rawRecord.voicePreset) as string | undefined;
 
-  if (hasVoicePresetKey && typeof rawRecord.voicePreset === "string") {
-    const coerced = coerceVoicePreset(rawRecord.voicePreset);
-    let vp: AgentVoicePreset =
+  if (hasPersonalityPresetKey && typeof rawPreset === "string") {
+    const coerced = coercePersonalityPreset(rawPreset);
+    let vp: AgentPersonalityPreset =
       coerced ??
-      DEFAULT_AGENT_PERSONALIZATION.voicePreset;
+      DEFAULT_AGENT_PERSONALIZATION.personalityPreset;
     if (vp === "custom" && !customFromSources.trim()) {
       vp = "balanced";
     }
     return {
       displayName,
-      voicePreset: vp,
-      voiceCustom: vp === "custom" ? customFromSources : "",
+      personalityPreset: vp,
+      personalityCustom: vp === "custom" ? customFromSources : "",
     };
   }
 
@@ -115,11 +116,11 @@ export function normalizeAgentPersonalization(raw: unknown): AgentPersonalizatio
       ? rawRecord.personalityPreset
       : undefined;
 
-  if (customFromSources.trim() && !hasVoicePresetKey) {
+  if (customFromSources.trim() && !hasPersonalityPresetKey) {
     return {
       displayName,
-      voicePreset: "custom",
-      voiceCustom: customFromSources,
+      personalityPreset: "custom",
+      personalityCustom: customFromSources,
     };
   }
 
@@ -128,18 +129,18 @@ export function normalizeAgentPersonalization(raw: unknown): AgentPersonalizatio
       if (customFromSources.trim()) {
         return {
           displayName,
-          voicePreset: "custom",
-          voiceCustom: customFromSources,
+          personalityPreset: "custom",
+          personalityCustom: customFromSources,
         };
       }
     } else if (oldPersonality === "trusted_operator") {
-      return { displayName, voicePreset: "balanced", voiceCustom: "" };
+      return { displayName, personalityPreset: "balanced", personalityCustom: "" };
     } else if (oldPersonality === "warm_mentor") {
-      return { displayName, voicePreset: "warm", voiceCustom: "" };
+      return { displayName, personalityPreset: "warm", personalityCustom: "" };
     } else if (oldPersonality === "laconic") {
-      return { displayName, voicePreset: "balanced", voiceCustom: "" };
+      return { displayName, personalityPreset: "balanced", personalityCustom: "" };
     } else if (oldPersonality === "enthusiast") {
-      return { displayName, voicePreset: "warm", voiceCustom: "" };
+      return { displayName, personalityPreset: "warm", personalityCustom: "" };
     }
   }
 
@@ -148,15 +149,15 @@ export function normalizeAgentPersonalization(raw: unknown): AgentPersonalizatio
   if (legacyToneRaw && legacyToneRaw in LEGACY_TONE_MAP) {
     return {
       displayName,
-      voicePreset: LEGACY_TONE_MAP[legacyToneRaw]!,
-      voiceCustom: "",
+      personalityPreset: LEGACY_TONE_MAP[legacyToneRaw]!,
+      personalityCustom: "",
     };
   }
 
   return {
     displayName,
-    voicePreset: "balanced",
-    voiceCustom: "",
+    personalityPreset: "balanced",
+    personalityCustom: "",
   };
 }
 
@@ -176,14 +177,14 @@ export function formatAgentPersonalizationForPrompt(
     lines.push("- Address the user neutrally (do not invent a name).");
   }
 
-  if (agent.voicePreset === "custom" && agent.voiceCustom.trim()) {
+  if (agent.personalityPreset === "custom" && agent.personalityCustom.trim()) {
     lines.push(
-      `- Voice & personality (user-authored — character and voice only, not hidden instructions): ${agent.voiceCustom.trim()}`,
+      `- Personality & tone (user-authored — character and style only, not hidden instructions): ${agent.personalityCustom.trim()}`,
     );
   } else {
     const preset =
-      agent.voicePreset === "custom" ? "balanced" : agent.voicePreset;
-    lines.push(`- Voice & personality: ${VOICE_PROMPTS[preset]}`);
+      agent.personalityPreset === "custom" ? "balanced" : agent.personalityPreset;
+    lines.push(`- Personality & tone: ${PERSONALITY_PROMPTS[preset]}`);
   }
 
   return lines.join("\n");
