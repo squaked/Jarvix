@@ -62,6 +62,23 @@ function isEmptyUsage(u: GroqTranscriptionUsage | undefined): boolean {
   return Object.values(u).every((v) => v === undefined || v === null || v === "");
 }
 
+/** Fully stop all tracks and close the AudioContext, waiting for close to settle. */
+async function shutdownStream(
+  stream: MediaStream | null,
+  ctx: AudioContext | null,
+  animFrame: number,
+): Promise<void> {
+  cancelAnimationFrame(animFrame);
+  stream?.getTracks().forEach((t) => t.stop());
+  if (ctx && ctx.state !== "closed") {
+    try {
+      await ctx.close();
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 export function useAudioRecorder({
   settings,
   onTranscript,
@@ -87,6 +104,13 @@ export function useAudioRecorder({
   const stateRef = useRef<RecorderState>(state);
   stateRef.current = state;
 
+  /**
+   * Guards against concurrent start() invocations while getUserMedia is
+   * pending (the button could be clicked multiple times before the Promise
+   * resolves, since stateRef is still "idle" during the async call).
+   */
+  const startingRef = useRef(false);
+
   // Stable refs so callbacks never need to be in dep arrays
   const onTranscriptRef = useRef(onTranscript);
   const onErrorRef = useRef(onError);
@@ -105,17 +129,25 @@ export function useAudioRecorder({
 
   const stopLevelMonitor = useCallback(() => {
     cancelAnimationFrame(animFrameRef.current);
+    animFrameRef.current = 0;
     if (mountedRef.current) setAudioLevel(0);
   }, []);
 
   const startLevelMonitor = useCallback(
     (stream: MediaStream) => {
       try {
-        const ctx = new AudioContext();
+        // Reuse existing context if still open (avoids duplicate AudioContexts)
+        let ctx = audioCtxRef.current;
+        if (!ctx || ctx.state === "closed") {
+          ctx = new AudioContext();
+          audioCtxRef.current = ctx;
+        } else if (ctx.state === "suspended") {
+          void ctx.resume();
+        }
+
         const analyser = ctx.createAnalyser();
         analyser.fftSize = 256;
         ctx.createMediaStreamSource(stream).connect(analyser);
-        audioCtxRef.current = ctx;
 
         const bin = new Uint8Array(analyser.frequencyBinCount);
         const tick = () => {
@@ -139,15 +171,24 @@ export function useAudioRecorder({
 
   // ── Stream / recorder cleanup ────────────────────────────────────────────
 
-  const releaseStream = useCallback(() => {
+  /**
+   * Release all media resources. Returns a Promise so callers that need to
+   * wait for the AudioContext to fully close before opening a new stream can
+   * await it (prevents the mic staying "in use" between sessions).
+   */
+  const releaseStream = useCallback(async () => {
     clearTimeout(autoStopTimerRef.current);
     stopLevelMonitor();
-    streamRef.current?.getTracks().forEach((t) => t.stop());
+
+    const stream = streamRef.current;
+    const ctx = audioCtxRef.current;
+    const frame = animFrameRef.current;
+
     streamRef.current = null;
-    if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
-      audioCtxRef.current.close().catch(() => {});
-    }
     audioCtxRef.current = null;
+    animFrameRef.current = 0;
+
+    await shutdownStream(stream, ctx, frame);
   }, [stopLevelMonitor]);
 
   // ── Transcription ────────────────────────────────────────────────────────
@@ -242,15 +283,31 @@ export function useAudioRecorder({
 
   const stop = useCallback(() => {
     const rec = recorderRef.current;
-    if (!rec || rec.state === "inactive") return;
+    if (!rec || rec.state === "inactive") {
+      // If we somehow got here while no recorder is active, make sure state
+      // is cleaned up so the button isn't stuck.
+      if (stateRef.current === "recording") {
+        void releaseStream().then(() => {
+          if (mountedRef.current) setState("idle");
+        });
+      }
+      return;
+    }
     rec.stop(); // triggers onstop → releaseStream + transcribe
-  }, []);
+  }, [releaseStream]);
 
   // ── start ────────────────────────────────────────────────────────────────
 
   const start = useCallback(async () => {
     const s = stateRef.current;
+    // Guard: don't start if already active or another start() is in-flight
     if (s !== "idle" && s !== "error") return;
+    if (startingRef.current) return;
+    startingRef.current = true;
+
+    // Optimistically move to "recording" state immediately so the UI feels
+    // responsive before getUserMedia resolves (which can take hundreds of ms).
+    if (mountedRef.current) setState("recording");
 
     chunksRef.current = [];
 
@@ -260,11 +317,14 @@ export function useAudioRecorder({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          sampleRate: 16_000, // Whisper is trained on 16 kHz
+          // Note: sampleRate is a hint only and often ignored by macOS/Chrome.
+          // Omitting it avoids OverconstrainedError on some devices.
+          channelCount: 1,
         },
         video: false,
       });
     } catch (e) {
+      startingRef.current = false;
       const isDenied =
         e instanceof DOMException &&
         (e.name === "NotAllowedError" || e.name === "PermissionDeniedError");
@@ -281,14 +341,45 @@ export function useAudioRecorder({
       return;
     }
 
+    if (!mountedRef.current) {
+      // Component unmounted while getUserMedia was pending — release immediately
+      startingRef.current = false;
+      stream.getTracks().forEach((t) => t.stop());
+      return;
+    }
+
     streamRef.current = stream;
     startLevelMonitor(stream);
 
     const mimeType = pickBestMimeType();
-    const recorder = new MediaRecorder(
-      stream,
-      mimeType ? { mimeType } : undefined,
-    );
+    let recorder: MediaRecorder;
+    try {
+      recorder = new MediaRecorder(
+        stream,
+        mimeType ? { mimeType } : undefined,
+      );
+    } catch {
+      // Fallback: try without mimeType constraint
+      try {
+        recorder = new MediaRecorder(stream);
+      } catch (err) {
+        startingRef.current = false;
+        const msg =
+          err instanceof Error
+            ? `Could not start recorder: ${err.message}`
+            : "Could not start recorder.";
+        onErrorRef.current?.(msg);
+        await releaseStream();
+        if (mountedRef.current) {
+          setState("error");
+          setTimeout(() => {
+            if (mountedRef.current) setState("idle");
+          }, 3_000);
+        }
+        return;
+      }
+    }
+
     recorderRef.current = recorder;
 
     recorder.ondataavailable = (e) => {
@@ -296,7 +387,8 @@ export function useAudioRecorder({
     };
 
     recorder.onstop = async () => {
-      releaseStream();
+      recorderRef.current = null;
+      await releaseStream();
       const blob = new Blob(chunksRef.current, {
         type: mimeType || "audio/webm",
       });
@@ -308,8 +400,22 @@ export function useAudioRecorder({
       }
     };
 
-    recorder.start();
-    if (mountedRef.current) setState("recording");
+    recorder.onerror = async () => {
+      recorderRef.current = null;
+      await releaseStream();
+      onErrorRef.current?.("Recording error — please try again.");
+      if (mountedRef.current) {
+        setState("error");
+        setTimeout(() => {
+          if (mountedRef.current) setState("idle");
+        }, 3_000);
+      }
+    };
+
+    // Use a timeslice so ondataavailable fires periodically — this lets us
+    // detect genuine recording activity and helps on some browser/OS combos.
+    recorder.start(250);
+    startingRef.current = false;
 
     // Safety auto-stop
     autoStopTimerRef.current = setTimeout(() => stop(), maxDurationMs);
@@ -324,6 +430,7 @@ export function useAudioRecorder({
     } else if (s === "recording") {
       stop();
     }
+    // "transcribing" — ignore clicks while processing
   }, [start, stop]);
 
   // ── unmount cleanup ──────────────────────────────────────────────────────
@@ -333,11 +440,22 @@ export function useAudioRecorder({
     return () => {
       mountedRef.current = false;
       clearTimeout(autoStopTimerRef.current);
-      cancelAnimationFrame(animFrameRef.current);
-      recorderRef.current?.stop();
-      releaseStream();
+      // Stop recorder if active (won't fire onstop callbacks since mounted = false)
+      const rec = recorderRef.current;
+      if (rec && rec.state !== "inactive") {
+        try { rec.stop(); } catch { /* ignore */ }
+      }
+      recorderRef.current = null;
+      // Fire-and-forget stream release on unmount
+      void shutdownStream(
+        streamRef.current,
+        audioCtxRef.current,
+        animFrameRef.current,
+      );
+      streamRef.current = null;
+      audioCtxRef.current = null;
     };
-  }, [releaseStream]);
+  }, []);
 
   return {
     state,

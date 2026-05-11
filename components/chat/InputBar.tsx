@@ -248,7 +248,7 @@ export function InputBar({
         >
           <motion.button
             type="button"
-            disabled={busy && !recording}
+            disabled={transcribing}
             aria-label={micAriaLabel}
             aria-busy={transcribing}
             title={micAriaLabel}
@@ -264,9 +264,9 @@ export function InputBar({
                 (recorderError
                   ? "text-red-400"
                   : transcribing
-                    ? "text-accent/60"
+                    ? "text-accent/60 pointer-events-none"
                     : "text-muted hover:text-accent"),
-              busy && !recording && "pointer-events-none opacity-40",
+              disabled && !recording && !transcribing && "opacity-40",
             )}
           >
             {transcribing ? (
