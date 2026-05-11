@@ -180,54 +180,82 @@ ok "Auto-updater installed"
 # ── 9. Jarvix.app in ~/Applications ───────────────────────────────────────────
 step "Creating Jarvix app launcher..."
 mkdir -p "$HOME/Applications"
+mkdir -p "$INSTALL_DIR/scripts/macos"
 
-# 1. Create the bash launcher script
+# 1. Start script – ensures the server is up then returns (no infinite loop).
+#    Called by the AppleScript's on run handler and the idle watchdog.
 LAUNCHER_SCRIPT="$INSTALL_DIR/scripts/macos/launcher.sh"
-mkdir -p "$(dirname "$LAUNCHER_SCRIPT")"
-
 cat > "$LAUNCHER_SCRIPT" << 'APPSCRIPT'
 #!/bin/bash
 INSTALL_DIR="__JARVIX_INSTALL_DIR_PLACEHOLDER__"
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin"
 export JARVIX_INSTALL_DIR="$INSTALL_DIR"
-
-cleanup() {
-  local pid
-  pid="$(/usr/sbin/lsof -ti:3000 -sTCP:LISTEN 2>/dev/null | head -1)"
-  [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
-  exit 0
-}
-trap cleanup SIGTERM SIGINT SIGHUP
+LOG_DIR="$INSTALL_DIR/logs"
+mkdir -p "$LOG_DIR"
 
 if ! /usr/sbin/lsof -ti:3000 -sTCP:LISTEN >/dev/null 2>&1; then
   cd "$INSTALL_DIR"
-  nohup npm start > /dev/null 2>&1 &
-  disown || true
+  nohup npm start >> "$LOG_DIR/server.log" 2>&1 &
+  # Wait up to 30 s for the server to respond before returning.
+  for i in $(seq 1 30); do
+    sleep 1
+    /usr/bin/curl -fs --max-time 2 http://localhost:3000 >/dev/null 2>&1 && break
+  done
 fi
-
-/usr/bin/open "http://localhost:3000"
-
-while true; do
-  if ! /usr/bin/curl -fs --max-time 3 http://localhost:3000 >/dev/null 2>&1; then
-    sleep 60
-    if ! /usr/bin/curl -fs --max-time 3 http://localhost:3000 >/dev/null 2>&1; then
-       cd "$INSTALL_DIR"
-       nohup npm start > /dev/null 2>&1 &
-       disown || true
-    fi
-  fi
-  sleep 10
-done
 APPSCRIPT
-
 sed -i '' "s|__JARVIX_INSTALL_DIR_PLACEHOLDER__|${INSTALL_DIR}|g" "$LAUNCHER_SCRIPT"
 chmod +x "$LAUNCHER_SCRIPT"
 
-# 2. Build the app bundle
-rm -rf "$APP_PATH"
-osacompile -o "$APP_PATH" -e "do shell script \"$LAUNCHER_SCRIPT > /dev/null 2>&1 &\""
+# 2. Quit script – graceful API call then force-kill fallback.
+QUIT_SCRIPT="$INSTALL_DIR/scripts/macos/quit-server.sh"
+cat > "$QUIT_SCRIPT" << 'QUITSCRIPT'
+#!/bin/bash
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin"
+/usr/bin/curl -s --max-time 3 -X POST http://localhost:3000/api/quit >/dev/null 2>&1 || true
+sleep 1
+PID="$(/usr/sbin/lsof -ti:3000 -sTCP:LISTEN 2>/dev/null | head -1)"
+[ -n "$PID" ] && kill "$PID" 2>/dev/null || true
+QUITSCRIPT
+chmod +x "$QUIT_SCRIPT"
 
-# 3. Apply Icon and Metadata
+# 3. Build stay-open .app bundle with proper Dock lifecycle.
+#    -s  → stay-open applet: process persists → Dock shows the running dot.
+#    on run    – start server + open browser
+#    on reopen – re-open browser when Dock icon clicked while already running
+#    on idle   – silent watchdog every 30 s; restarts server if it died
+#    on quit   – graceful /api/quit + force-kill when user does Cmd+Q or Dock > Quit
+APPLESCRIPT_TMP="/tmp/jarvix_launcher.applescript"
+cat > "$APPLESCRIPT_TMP" << APPLESCRIPT
+property installDir : "${INSTALL_DIR}"
+
+on run
+    do shell script quoted form of "${LAUNCHER_SCRIPT}"
+    open location "http://localhost:3000"
+end run
+
+on reopen
+    open location "http://localhost:3000"
+end reopen
+
+on idle
+    set serverUp to (do shell script "if /usr/sbin/lsof -ti:3000 -sTCP:LISTEN >/dev/null 2>&1; then echo yes; else echo no; fi")
+    if serverUp is "no" then
+        do shell script "'${LAUNCHER_SCRIPT}' >/dev/null 2>&1 &"
+    end if
+    return 30
+end idle
+
+on quit
+    do shell script quoted form of "${QUIT_SCRIPT}"
+    continue quit
+end quit
+APPLESCRIPT
+
+rm -rf "$APP_PATH"
+osacompile -s -o "$APP_PATH" "$APPLESCRIPT_TMP"
+rm -f "$APPLESCRIPT_TMP"
+
+# 4. Apply Icon and Metadata
 ICON_NAME="JarvixIcon"
 REAL_PNG="/tmp/jarvix_icon_real.png"
 ICONSET_DIR="/tmp/Jarvix.iconset"
