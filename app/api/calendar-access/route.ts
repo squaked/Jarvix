@@ -1,4 +1,8 @@
-import { isEventKitHelperInstalled, helperAuthStatus } from "@/lib/eventkit-helper-client";
+import {
+  isEventKitHelperInstalled,
+  helperAuthStatus,
+} from "@/lib/eventkit-helper-client";
+import { isCalendarReadAllowedStatus } from "@/lib/tool-runners/eventkit";
 
 export const runtime = "nodejs";
 
@@ -7,27 +11,22 @@ export const runtime = "nodejs";
  * Distinct from POST /api/open-calendars-privacy, which actively requests
  * access and opens System Settings. Used by onboarding / Settings to show
  * a live "Granted / Not granted" badge without surfacing a permission prompt.
+ *
+ * Checks both the Jarvix helper (if built) and the Node/eventkit-node path:
+ * either may be allowed in Privacy → Calendars — both are used for reads.
  */
 export async function GET() {
-  // 1. Prefer the small Jarvix EventKit helper (shows up as "Jarvix" in
-  //    Privacy & Security). It's the only path that reflects the user's
-  //    real choice when they granted access to "Jarvix" specifically.
+  let helper: { status: string; granted: boolean } | undefined;
   if (isEventKitHelperInstalled()) {
     try {
       const status = await helperAuthStatus();
-      const granted = status === "fullAccess" || status === "authorized";
-      return Response.json({
-        granted,
-        status,
-        source: "helper",
-      });
+      helper = { status, granted: isCalendarReadAllowedStatus(status) };
     } catch {
-      /* fall through */
+      /* ignore */
     }
   }
 
-  // 2. Fall back to the embedded eventkit-node addon (perm shows up as
-  //    whichever process started the server, e.g. Terminal/Cursor/Node).
+  let eventkitNode: { status: string; granted: boolean } | undefined;
   try {
     const ek = await import("eventkit-node");
     let status = "unknown";
@@ -36,17 +35,41 @@ export async function GET() {
     } catch {
       /* keep "unknown" */
     }
-    const granted = status === "fullAccess" || status === "authorized";
-    return Response.json({
-      granted,
-      status,
-      source: "eventkit-node",
-    });
+    eventkitNode = { status, granted: isCalendarReadAllowedStatus(status) };
   } catch {
-    return Response.json({
-      granted: false,
-      status: "eventkit unavailable",
-      source: "none",
-    });
+    /* native addon missing */
   }
+
+  const granted = Boolean(helper?.granted || eventkitNode?.granted);
+  const status = (() => {
+    if (granted) {
+      if (helper?.granted) return helper.status;
+      return eventkitNode?.status ?? "unknown";
+    }
+    if (helper && eventkitNode) {
+      return `helper: ${helper.status}; node: ${eventkitNode.status}`;
+    }
+    return helper?.status ?? eventkitNode?.status ?? "eventkit unavailable";
+  })();
+
+  const source =
+    helper?.granted && eventkitNode?.granted
+      ? "helper+eventkit-node"
+      : helper?.granted
+        ? "helper"
+        : eventkitNode?.granted
+          ? "eventkit-node"
+          : helper
+            ? "helper"
+            : eventkitNode
+              ? "eventkit-node"
+              : "none";
+
+  return Response.json({
+    granted,
+    status,
+    source,
+    helper,
+    eventkitNode,
+  });
 }

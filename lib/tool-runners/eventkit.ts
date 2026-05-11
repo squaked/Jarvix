@@ -50,21 +50,23 @@ function safeAuthEvent(ek: NonNullable<Awaited<ReturnType<typeof loadEventKit>>>
   }
 }
 
-/** macOS 14+ uses fullAccess; older SDKs used authorized. Callback may return false while status is already allowed. */
-function calendarReadAllowed(status: string): boolean {
-  return status === "fullAccess" || status === "authorized";
+/** macOS 14+ uses fullAccess; older SDKs used authorized. Normalized for robustness. */
+export function isCalendarReadAllowedStatus(status: string): boolean {
+  const s = String(status).trim().toLowerCase();
+  return s === "fullaccess" || s === "authorized";
 }
 
 function calendarWriteAllowed(status: string): boolean {
-  return calendarReadAllowed(status) || status === "writeOnly";
+  if (isCalendarReadAllowedStatus(status)) return true;
+  return String(status).trim().toLowerCase() === "writeonly";
 }
 
 type LoadedEK = NonNullable<Awaited<ReturnType<typeof loadEventKit>>>;
 
 async function ensureCalendarReadAccess(ek: LoadedEK): Promise<boolean> {
-  if (calendarReadAllowed(safeAuthEvent(ek))) return true;
+  if (isCalendarReadAllowedStatus(safeAuthEvent(ek))) return true;
   const callbackOk = await ek.requestFullAccessToEvents().catch(() => false);
-  return callbackOk || calendarReadAllowed(safeAuthEvent(ek));
+  return callbackOk || isCalendarReadAllowedStatus(safeAuthEvent(ek));
 }
 
 async function ensureCalendarWriteAccess(ek: LoadedEK): Promise<boolean> {
@@ -142,17 +144,15 @@ export async function getCalendarEventsTodayWithHint(): Promise<CalendarReadResu
     try {
       await helperRequestAccess();
       const status = await helperAuthStatus();
-      if (!calendarReadAllowed(status)) {
-        return appleScriptFallbackForToday(
-          `Calendar access isn’t allowed yet (${status}).`,
-        );
+      if (isCalendarReadAllowedStatus(status)) {
+        const start = new Date();
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(start);
+        end.setHours(23, 59, 59, 999);
+        const events = await helperEventsInRange(start, end);
+        return { events, accessGranted: true };
       }
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(start);
-      end.setHours(23, 59, 59, 999);
-      const events = await helperEventsInRange(start, end);
-      return { events, accessGranted: true };
+      /* Helper exists but isn’t allowed — try eventkit-node (e.g. user enabled Cursor only). */
     } catch {
       /* fall through to eventkit-node / AppleScript */
     }
@@ -220,15 +220,10 @@ export async function getCalendarEventsRangeWithHint(
     try {
       await helperRequestAccess();
       const status = await helperAuthStatus();
-      if (!calendarReadAllowed(status)) {
-        return appleScriptFallbackForRange(
-          `Calendar access isn’t allowed yet (${status}).`,
-          rangeStart,
-          rangeEnd,
-        );
+      if (isCalendarReadAllowedStatus(status)) {
+        const events = await helperEventsInRange(rangeStart, rangeEnd);
+        return { events, accessGranted: true };
       }
-      const events = await helperEventsInRange(rangeStart, rangeEnd);
-      return { events, accessGranted: true };
     } catch {
       /* fall through */
     }
@@ -350,12 +345,14 @@ export async function requestCalendarAccessAttempt(): Promise<{
   if (await eventKitHelperUsable()) {
     try {
       const { granted, status } = await helperRequestAccess();
-      return {
-        eventkitAvailable: true,
-        accessGranted: granted,
-        status,
-        jarvixHelperReady: true,
-      };
+      if (granted || isCalendarReadAllowedStatus(status)) {
+        return {
+          eventkitAvailable: true,
+          accessGranted: true,
+          status,
+          jarvixHelperReady: true,
+        };
+      }
     } catch {
       /* fall through */
     }
