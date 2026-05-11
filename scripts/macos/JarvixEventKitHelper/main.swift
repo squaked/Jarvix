@@ -1,5 +1,96 @@
+import Darwin
 import EventKit
 import Foundation
+
+// MARK: - TCC responsibility disclaim
+//
+// When the helper is spawned directly by Node (`child_process.spawn`), macOS
+// TCC walks the responsibility chain *up* to the parent process to decide who
+// is asking for calendar access. That ends up being whatever launched node
+// (the AppleScript applet, Cursor, Terminal, …) — not this binary — so the
+// "Jarvix" toggle the user enabled under Privacy → Calendars (which is bound
+// to `ai.jarvix.eventkit-helper`) is ignored and the helper sees
+// `notDetermined`.
+//
+// The fix is to disclaim parent responsibility before doing any EventKit work,
+// so this process becomes its own responsible app and TCC keys lookups on the
+// helper's own bundle id + CDHash. We do this by re-exec'ing ourselves with
+// the private `responsibility_spawnattrs_setdisclaim` posix_spawn attribute
+// (available since macOS 10.14, used by Apple and many shipping apps for
+// exactly this purpose).
+//
+// Pattern adapted from Apple/Qt's well-known recipe; uses POSIX_SPAWN_SETEXEC
+// so we don't fork — same PID, new responsibility.
+
+@_silgen_name("responsibility_spawnattrs_setdisclaim")
+private func responsibility_spawnattrs_setdisclaim(
+    _ attrs: UnsafeMutablePointer<posix_spawnattr_t?>,
+    _ disclaim: Int32
+) -> Int32
+
+private let kDisclaimSentinelEnv = "JARVIX_HELPER_DISCLAIMED"
+
+private func disclaimResponsibilityIfNeeded() {
+    // Sentinel prevents an infinite re-exec loop.
+    if ProcessInfo.processInfo.environment[kDisclaimSentinelEnv] != nil { return }
+
+    var attr: posix_spawnattr_t?
+    guard posix_spawnattr_init(&attr) == 0 else { return }
+    defer { posix_spawnattr_destroy(&attr) }
+
+    var flags: Int16 = Int16(POSIX_SPAWN_SETEXEC)
+
+    // Reset signal mask and handlers, matching the Qt/Apple template.
+    var noSignals = sigset_t()
+    sigemptyset(&noSignals)
+    if posix_spawnattr_setsigmask(&attr, &noSignals) == 0 {
+        flags |= Int16(POSIX_SPAWN_SETSIGMASK)
+    }
+    var allSignals = sigset_t()
+    sigfillset(&allSignals)
+    if posix_spawnattr_setsigdefault(&attr, &allSignals) == 0 {
+        flags |= Int16(POSIX_SPAWN_SETSIGDEF)
+    }
+    posix_spawnattr_setflags(&attr, flags)
+
+    // Disclaim parent responsibility — child (= us after exec) becomes its own
+    // responsible process for TCC.
+    if responsibility_spawnattrs_setdisclaim(&attr, 1) != 0 { return }
+
+    // Build argv from the current process.
+    let argv = CommandLine.arguments
+    let cArgv: [UnsafeMutablePointer<CChar>?] =
+        argv.map { strdup($0) } + [nil]
+    defer { for p in cArgv where p != nil { free(p) } }
+
+    // Build envp from the current env + the sentinel.
+    var env = ProcessInfo.processInfo.environment
+    env[kDisclaimSentinelEnv] = "1"
+    let envStrings = env.map { "\($0)=\($1)" }
+    let cEnv: [UnsafeMutablePointer<CChar>?] =
+        envStrings.map { strdup($0) } + [nil]
+    defer { for p in cEnv where p != nil { free(p) } }
+
+    // POSIX_SPAWN_SETEXEC means this never returns on success — same PID,
+    // stdin/stdout/stderr inherited, new responsibility identity.
+    var pid: pid_t = 0
+    _ = cArgv.withUnsafeBufferPointer { argvBuf in
+        cEnv.withUnsafeBufferPointer { envBuf in
+            posix_spawnp(
+                &pid,
+                argv[0],
+                nil,
+                &attr,
+                argvBuf.baseAddress.map { UnsafeMutablePointer(mutating: $0) },
+                envBuf.baseAddress.map { UnsafeMutablePointer(mutating: $0) }
+            )
+        }
+    }
+    // If we reach here, posix_spawn with SETEXEC failed — proceed without
+    // disclaim. TCC will likely deny but at least we don't crash.
+}
+
+disclaimResponsibilityIfNeeded()
 
 let store = EKEventStore()
 
