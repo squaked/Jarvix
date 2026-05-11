@@ -6,14 +6,20 @@ import type { CalendarEventBrief } from "./eventkit";
 const execFileAsync = promisify(execFile);
 
 /**
- * Fallback when native EventKit is unavailable or declined.
- * Supports date range.
+ * Fallback read via Calendar.app (AppleScript).
+ * Supports date range. `ran` distinguishes “script succeeded, no events” from failures.
  */
+export type CalendarAppleScriptRangeResult = {
+  events: CalendarEventBrief[];
+  /** True when osascript ran successfully (exit 0). Empty events + ran true means no events in range, not necessarily denied. */
+  ran: boolean;
+};
+
 export async function calendarEventsRangeAppleScript(
   start: Date,
   end: Date,
-): Promise<CalendarEventBrief[]> {
-  if (process.platform !== "darwin") return [];
+): Promise<CalendarAppleScriptRangeResult> {
+  if (process.platform !== "darwin") return { events: [], ran: false };
 
   const startSecs = Math.floor(start.getTime() / 1000);
   const endSecs = Math.floor(end.getTime() / 1000);
@@ -102,18 +108,15 @@ end run
         calendar: calendar || "?",
       });
     }
-    return out;
+    return { events: out, ran: true };
   } catch {
-    return [];
+    return { events: [], ran: false };
   }
 }
 
-/**
- * Fallback when native EventKit is unavailable or declined.
- * May prompt Automation for Calendar.app (separate from EventKit in Privacy).
- */
+/** Same as range helper for the local-calendar day [00:00, next midnight). */
 export async function calendarEventsTodayAppleScript(): Promise<
-  CalendarEventBrief[]
+  CalendarAppleScriptRangeResult
 > {
   const start = new Date();
   start.setHours(0, 0, 0, 0);

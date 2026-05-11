@@ -90,12 +90,15 @@ async function appleScriptFallbackForToday(explain: string): Promise<CalendarRea
   const { calendarEventsTodayAppleScript } = await import(
     "./calendar-applescript"
   );
-  const events = await calendarEventsTodayAppleScript();
-  if (events.length > 0) {
+  const { events, ran } = await calendarEventsTodayAppleScript();
+  if (ran) {
     return {
       events,
       accessGranted: true,
-      hint: "Accessed via Apple Calendar fallback.",
+      hint:
+        events.length > 0
+          ? "Accessed via Apple Calendar fallback."
+          : `${explain} Apple Calendar fallback ran successfully; no events in range.`,
     };
   }
 
@@ -114,12 +117,15 @@ async function appleScriptFallbackForRange(
   const { calendarEventsRangeAppleScript } = await import(
     "./calendar-applescript"
   );
-  const events = await calendarEventsRangeAppleScript(start, end);
-  if (events.length > 0) {
+  const { events, ran } = await calendarEventsRangeAppleScript(start, end);
+  if (ran) {
     return {
       events,
       accessGranted: true,
-      hint: "Accessed via Apple Calendar fallback.",
+      hint:
+        events.length > 0
+          ? "Accessed via Apple Calendar fallback."
+          : `${explain} Apple Calendar fallback ran successfully; no events in range.`,
     };
   }
 
