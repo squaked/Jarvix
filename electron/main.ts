@@ -1,6 +1,9 @@
 import { app, BrowserWindow, Menu, shell } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
 import * as http from "http";
+import * as os from "os";
+import * as path from "path";
+import { spawn } from "child_process";
 
 const PORT = 3000;
 const SERVER_URL = `http://localhost:${PORT}`;
@@ -134,8 +137,47 @@ function createWindow(): void {
   void bootConnect();
 }
 
+// ── Install dir + server spawning ────────────────────────────────────────────
+// Derived from env var set by LaunchAgent, falling back to the default install
+// path used by install.sh. Electron does not bundle the Next.js server — it
+// relies on it running as a LaunchAgent or starts it on demand here.
+function installDir(): string {
+  return (
+    process.env.JARVIX_INSTALL_DIR ??
+    path.join(os.homedir(), ".jarvix-app")
+  );
+}
+
+function ensureServerRunning(): void {
+  const dir = installDir();
+  const launcherScript = path.join(dir, "scripts", "macos", "launcher.sh");
+  // launcher.sh is idempotent: it exits immediately if the server is already
+  // listening on port 3000, so it's safe to call unconditionally.
+  const child = spawn("/bin/bash", [launcherScript], {
+    detached: true,
+    stdio: "ignore",
+    cwd: dir,
+    env: {
+      ...process.env,
+      PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin:${process.env.PATH ?? ""}`,
+      JARVIX_INSTALL_DIR: dir,
+    },
+  });
+  child.unref();
+}
+
 async function bootConnect(): Promise<void> {
-  if (await waitForServer(60_000)) {
+  // Quick check first — if the LaunchAgent already started the server, connect
+  // straight away without the launcher.sh overhead.
+  if (await isServerUp()) {
+    mainWindow?.loadURL(SERVER_URL);
+    return;
+  }
+
+  // Server isn't up yet — spawn launcher.sh to start it, then wait.
+  ensureServerRunning();
+
+  if (await waitForServer(90_000)) {
     mainWindow?.loadURL(SERVER_URL);
   } else {
     mainWindow?.loadURL(
