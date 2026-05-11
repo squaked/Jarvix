@@ -88,7 +88,7 @@ web_search tries DuckDuckGo instant answers first, then falls back to Bing web r
   const memoryToolHint = settings.memoryEnabled
     ? `
 
-You may call remember_user_note when — and only when — the user gives information worth recalling across future chats (not one-off errands). Prefer skipping the tool if uncertain. Never store secrets or credentials.`
+You may call remember_user_note when the user shares durable preferences, constraints, or context worth recalling across chats — not one-off tasks. Skip if uncertain. Never store secrets or credentials. Phrase stored facts in neutral third person; omit display names (the user can change them in Settings).`
     : "";
 
   const memoryBlock = memoryFacts

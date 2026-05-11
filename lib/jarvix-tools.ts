@@ -213,13 +213,13 @@ export function createJarvixToolset(ctx: { memoryEnabled?: boolean }) {
       ? {
           remember_user_note: tool({
             description:
-              "Persist one short, durable fact about this user for future chats (name, long-term preferences, how they want you to behave). Call only when the user clearly shared something worth recalling later — not for one-off tasks, secrets/passwords, or obvious transient context. One fact per call; skip when unsure.",
+              "Persist one short, durable fact about this user for future chats (preferences, recurring context, how they want help). Do not include their display name — phrase in neutral third person. Call only when they clearly shared something worth recalling later — not one-off tasks, secrets/passwords, or transient context. One fact per call; skip when unsure.",
             inputSchema: z.object({
               fact: z
                 .string()
                 .min(8)
                 .max(200)
-                .describe("Single concise fact, first person or neutral phrasing"),
+                .describe("Single concise fact in neutral third person about the user; omit display name"),
             }),
             execute: async ({ fact }) => {
               try {
