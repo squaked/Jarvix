@@ -34,13 +34,21 @@ echo "  ║   Jarvix — AI Assistant   ║"
 echo "  ╚═══════════════════════════╝"
 
 # ── 1. Homebrew ────────────────────────────────────────────────────────────────
+# `curl … | bash` uses a non-login shell; ~/.zprofile is not sourced, so brew
+# may be missing from PATH even when installed. Add standard install locations first.
+if [ -x /opt/homebrew/bin/brew ]; then
+  eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [ -x /usr/local/bin/brew ]; then
+  eval "$(/usr/local/bin/brew shellenv)"
+fi
+
 if ! command -v brew &>/dev/null; then
   step "Installing Homebrew (this may ask for your password)..."
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-  # Initialize brew for this session
-  if [ -f "/opt/homebrew/bin/brew" ]; then
+  # Initialize brew for this session (same non-login PATH issue as above).
+  if [ -x /opt/homebrew/bin/brew ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
-  elif [ -f "/usr/local/bin/brew" ]; then
+  elif [ -x /usr/local/bin/brew ]; then
     eval "$(/usr/local/bin/brew shellenv)"
   fi
   command -v brew &>/dev/null || fail "Homebrew installed but not found in PATH. Please restart your terminal and re-run."
