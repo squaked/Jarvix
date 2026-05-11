@@ -23,12 +23,7 @@ Press `⌘ Space`, type **Jarvix**, press Enter — or click the Jarvix icon in 
 ---
 
 **Manual update**
-
-Updating can be done in the app's settings.
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/squaked/Jarvix/main/install.sh | bash
-```
+Use if something is broken, after quitting Jarvix, run the installer again.
 
 **Uninstall**
 
