@@ -69,6 +69,7 @@ ROLLBACK_REV="$BEFORE"
 
 # Older installs created these via rebuild-app.sh before they lived in git. If they
 # are still untracked, `git pull` aborts with "would be overwritten by merge".
+# Same for the AppleScript bundle scripts (now path-independent and tracked).
 for f in scripts/macos/launcher.sh scripts/macos/quit-server.sh; do
   if [ -f "$f" ] && ! git ls-files --error-unmatch "$f" >/dev/null 2>&1; then
     log "Removing untracked $f (blocks pull) — version from the repo will be used."
@@ -104,20 +105,18 @@ if ! npm run build --silent; then
 fi
 log "Build complete."
 
-# Ensure the install-specific scripts exist (they are gitignored, so a pull
-# that previously deleted them from tracking can leave them missing).
-QUIT_SCRIPT="$INSTALL_DIR/scripts/macos/quit-server.sh"
-if [ ! -f "$QUIT_SCRIPT" ]; then
-  log "Restoring missing quit-server.sh..."
-  cat > "$QUIT_SCRIPT" << 'HEREDOC'
-#!/bin/bash
-export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin"
-/usr/bin/curl -s --max-time 3 -X POST http://localhost:3000/api/quit >/dev/null 2>&1 || true
-sleep 1
-PID="$(/usr/sbin/lsof -ti:3000 -sTCP:LISTEN 2>/dev/null | head -1)"
-[ -n "$PID" ] && kill "$PID" 2>/dev/null || true
-HEREDOC
-  chmod +x "$QUIT_SCRIPT"
+# Make sure the install-specific scripts are executable. They are checked into
+# git now (path-independent) so they can't go missing on `git pull`, but a
+# fresh clone leaves them without +x on some filesystems.
+chmod +x "$INSTALL_DIR/scripts/macos/launcher.sh" "$INSTALL_DIR/scripts/macos/quit-server.sh" 2>/dev/null || true
+
+# Rebuild the .app bundle if the AppleScript template (rebuild-app.sh) or the
+# scripts it embeds were updated. Cheap to run and keeps the Dock launcher in
+# sync with the rest of the install.
+if git diff --name-only "$ROLLBACK_REV" HEAD | grep -qE '^scripts/macos/(rebuild-app|launcher|quit-server)\.sh$'; then
+  log "macOS launcher scripts changed — rebuilding Jarvix.app..."
+  /bin/bash "$INSTALL_DIR/scripts/macos/rebuild-app.sh" >> "$INSTALL_DIR/logs/update.log" 2>&1 || \
+    log "rebuild-app.sh failed — keeping previous Jarvix.app."
 fi
 
 # Signal to the running server that an update is ready.

@@ -1,6 +1,9 @@
 #!/bin/bash
 # Rebuilds ~/Applications/Jarvix.app in place without running the full install.
 # Run this after pulling an update that changes the app bundle behaviour.
+#
+# The shell scripts called from the bundle (launcher.sh, quit-server.sh) are now
+# checked into git and path-independent — this script no longer regenerates them.
 set -euo pipefail
 
 INSTALL_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -10,62 +13,71 @@ QUIT_SCRIPT="$INSTALL_DIR/scripts/macos/quit-server.sh"
 
 echo "  → Rebuilding Jarvix.app..."
 
-# ── 1. Start script ────────────────────────────────────────────────────────────
-cat > "$LAUNCHER_SCRIPT" << 'HEREDOC'
-#!/bin/bash
-INSTALL_DIR="__PLACEHOLDER__"
-export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin"
-export JARVIX_INSTALL_DIR="$INSTALL_DIR"
-LOG_DIR="$INSTALL_DIR/logs"
-mkdir -p "$LOG_DIR"
+# ── 1. Sanity: make sure the static scripts the applet calls actually exist ──
+for f in "$LAUNCHER_SCRIPT" "$QUIT_SCRIPT"; do
+  if [ ! -f "$f" ]; then
+    echo "    ✗ Missing required script: $f" >&2
+    echo "      Run \`git checkout -- scripts/macos/\` and try again." >&2
+    exit 1
+  fi
+  chmod +x "$f"
+done
 
-if ! /usr/sbin/lsof -ti:3000 -sTCP:LISTEN >/dev/null 2>&1; then
-  cd "$INSTALL_DIR"
-  nohup npm start >> "$LOG_DIR/server.log" 2>&1 &
-  for i in $(seq 1 30); do
-    sleep 1
-    /usr/bin/curl -fs --max-time 2 http://localhost:3000 >/dev/null 2>&1 && break
-  done
-fi
-HEREDOC
-sed -i '' "s|__PLACEHOLDER__|${INSTALL_DIR}|g" "$LAUNCHER_SCRIPT"
-chmod +x "$LAUNCHER_SCRIPT"
-
-# ── 2. Quit script ─────────────────────────────────────────────────────────────
-cat > "$QUIT_SCRIPT" << 'HEREDOC'
-#!/bin/bash
-export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin"
-/usr/bin/curl -s --max-time 3 -X POST http://localhost:3000/api/quit >/dev/null 2>&1 || true
+# ── 2. Stop any currently-running applet instances and stale launcher loops ──
+/usr/bin/pkill -f "Applications/Jarvix.app/Contents/MacOS/applet" 2>/dev/null || true
+/usr/bin/pkill -f "Applications/Jarvix.app/Contents/MacOS/Jarvix" 2>/dev/null || true
+/usr/bin/pkill -f "macos/launcher.sh" 2>/dev/null || true
 sleep 1
-PID="$(/usr/sbin/lsof -ti:3000 -sTCP:LISTEN 2>/dev/null | head -1)"
-[ -n "$PID" ] && kill "$PID" 2>/dev/null || true
-HEREDOC
-chmod +x "$QUIT_SCRIPT"
 
-# ── 3. Compile stay-open AppleScript app ──────────────────────────────────────
+# ── 3. Compile stay-open AppleScript app ─────────────────────────────────────
+#   on run     - dedup any other applet, start server, open browser
+#   on reopen  - reopen the browser when Dock icon is clicked
+#   on idle    - silent watchdog every 30 s; restarts server if it died
+#   on quit    - graceful /api/quit + force-kill, then *always* continue quit
 APPLESCRIPT_TMP="/tmp/jarvix_launcher.applescript"
 cat > "$APPLESCRIPT_TMP" << HEREDOC
 property installDir : "${INSTALL_DIR}"
+property launcherScript : "${LAUNCHER_SCRIPT}"
+property quitScript : "${QUIT_SCRIPT}"
 
 on run
-    do shell script quoted form of "${LAUNCHER_SCRIPT}"
-    open location "http://localhost:3000"
+    -- Avoid two applet instances holding the Dock icon at once: kill every
+    -- "applet" process whose pid is not our own (\$PPID inside do shell script
+    -- is the applet itself, since the applet spawns the shell).
+    try
+        do shell script "ME=\$PPID; /usr/bin/pgrep -f 'Applications/Jarvix.app/Contents/MacOS/applet' | while read p; do [ \"\$p\" != \"\$ME\" ] && kill \"\$p\" 2>/dev/null; done; /usr/bin/pkill -f 'Applications/Jarvix.app/Contents/MacOS/Jarvix' 2>/dev/null; /usr/bin/pkill -f 'macos/launcher.sh' 2>/dev/null; true"
+    end try
+    try
+        do shell script "/bin/bash " & quoted form of launcherScript
+    end try
+    try
+        open location "http://localhost:3000"
+    end try
 end run
 
 on reopen
-    open location "http://localhost:3000"
+    try
+        open location "http://localhost:3000"
+    end try
 end reopen
 
 on idle
-    set serverUp to (do shell script "if /usr/sbin/lsof -ti:3000 -sTCP:LISTEN >/dev/null 2>&1; then echo yes; else echo no; fi")
-    if serverUp is "no" then
-        do shell script "'${LAUNCHER_SCRIPT}' >/dev/null 2>&1 &"
-    end if
+    try
+        set serverUp to (do shell script "if /usr/sbin/lsof -ti:3000 -sTCP:LISTEN >/dev/null 2>&1; then echo yes; else echo no; fi")
+        if serverUp is "no" then
+            do shell script "/bin/bash " & quoted form of launcherScript & " >/dev/null 2>&1 &"
+        end if
+    end try
     return 30
 end idle
 
 on quit
-    do shell script quoted form of "${QUIT_SCRIPT}"
+    -- CRITICAL: must always reach \`continue quit\`, even if the quit script
+    -- errors or is missing. Otherwise the applet refuses to terminate and
+    -- the Dock "Quit" command appears to do nothing.
+    try
+        do shell script "/bin/bash " & quoted form of quitScript
+    end try
     continue quit
 end quit
 HEREDOC
@@ -74,7 +86,7 @@ rm -rf "$APP_PATH"
 osacompile -s -o "$APP_PATH" "$APPLESCRIPT_TMP"
 rm -f "$APPLESCRIPT_TMP"
 
-# ── 4. Apply icon and metadata ─────────────────────────────────────────────────
+# ── 4. Apply icon and metadata ───────────────────────────────────────────────
 ICON_NAME="JarvixIcon"
 REAL_PNG="/tmp/jarvix_icon_real.png"
 ICONSET_DIR="/tmp/Jarvix.iconset"
@@ -92,6 +104,10 @@ plutil -replace CFBundleDisplayName   -string "Jarvix"              "$APP_PATH/C
 plutil -replace CFBundleIdentifier    -string "com.jarvix.launcher" "$APP_PATH/Contents/Info.plist"
 plutil -replace CFBundleIconFile      -string "$ICON_NAME"          "$APP_PATH/Contents/Info.plist"
 plutil -replace CFBundleIconName      -string "$ICON_NAME"          "$APP_PATH/Contents/Info.plist"
+# LSMultipleInstancesProhibited tells LaunchServices to refuse a second
+# `open -a Jarvix` while one is already running — another defense against
+# duplicate applet instances.
+plutil -replace LSMultipleInstancesProhibited -bool true             "$APP_PATH/Contents/Info.plist"
 
 touch "$APP_PATH"
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \

@@ -14,14 +14,50 @@ type CalendarEventRow = {
 
 type HelperResult = Record<string, unknown> & { ok?: boolean; error?: string };
 
+const HELPER_REL_PATH =
+  "scripts/macos/JarvixEventKitHelper/JarvixEventKitHelper.app/Contents/MacOS/JarvixEventKitHelper";
+
+/**
+ * Locate the Jarvix EventKit helper binary.
+ *
+ * Search order:
+ *   1. $JARVIX_EVENTKIT_HELPER  — explicit override pointing at the binary.
+ *   2. $JARVIX_INSTALL_DIR      — set by launcher.sh / the LaunchAgent.
+ *   3. process.cwd()            — works when the server is started from the
+ *                                 install dir (npm run dev / npm start).
+ *   4. The repo root inferred from this module's path. Survives `cd`-ing into
+ *      any subdirectory before launching node.
+ *
+ * Using $JARVIX_INSTALL_DIR first is important: when npm is launched from a
+ * different cwd (e.g. via Cursor's task runner), process.cwd() can resolve to
+ * an unrelated path, the helper is "not found", and the code silently falls
+ * back to eventkit-node — which is attributed to a different macOS TCC bucket,
+ * making the "calendar shows as allowed but doesn't work" bug.
+ */
 export function resolveEventKitHelperExecutable(): string | null {
+  const candidates: string[] = [];
+
   const fromEnv = process.env.JARVIX_EVENTKIT_HELPER?.trim();
-  if (fromEnv && fs.existsSync(fromEnv)) return fromEnv;
-  const rel = path.join(
-    process.cwd(),
-    "scripts/macos/JarvixEventKitHelper/JarvixEventKitHelper.app/Contents/MacOS/JarvixEventKitHelper",
-  );
-  if (fs.existsSync(rel)) return rel;
+  if (fromEnv) candidates.push(fromEnv);
+
+  const installDir = process.env.JARVIX_INSTALL_DIR?.trim();
+  if (installDir) candidates.push(path.join(installDir, HELPER_REL_PATH));
+
+  candidates.push(path.join(process.cwd(), HELPER_REL_PATH));
+
+  // __dirname is something like <root>/lib (or .next/server/...) at runtime.
+  // Walk up to find a directory that contains the helper.
+  let dir = __dirname;
+  for (let i = 0; i < 6; i++) {
+    candidates.push(path.join(dir, HELPER_REL_PATH));
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+
+  for (const candidate of candidates) {
+    if (candidate && fs.existsSync(candidate)) return candidate;
+  }
   return null;
 }
 
@@ -35,11 +71,17 @@ export async function ensureEventKitHelperBuilt(): Promise<void> {
   if (resolveEventKitHelperExecutable()) return;
   if (process.platform !== "darwin") return;
 
-  const script = path.join(
-    process.cwd(),
-    "scripts/macos/JarvixEventKitHelper/build.sh",
-  );
-  if (!fs.existsSync(script)) return;
+  const buildScriptRel = "scripts/macos/JarvixEventKitHelper/build.sh";
+  const installDir = process.env.JARVIX_INSTALL_DIR?.trim();
+  const candidates = [
+    installDir ? path.join(installDir, buildScriptRel) : null,
+    path.join(process.cwd(), buildScriptRel),
+    path.join(__dirname, "..", buildScriptRel),
+    path.join(__dirname, "..", "..", buildScriptRel),
+  ].filter((p): p is string => p !== null);
+
+  const script = candidates.find((p) => fs.existsSync(p));
+  if (!script) return;
 
   ensureChain = ensureChain.then(async () => {
     if (resolveEventKitHelperExecutable()) return;
