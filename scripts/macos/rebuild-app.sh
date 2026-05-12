@@ -82,4 +82,8 @@ touch "$APP_PATH"
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
   -f "$APP_PATH" 2>/dev/null || true
 
+# ── 8. Icon cache (Dock/Finder often keep the old .icns until Icon Services refreshes)
+rm -rf "$HOME/Library/Caches/com.apple.iconservices.store" 2>/dev/null || true
+/usr/bin/killall Dock 2>/dev/null || true
+
 echo "    ✓ Jarvix.app rebuilt — open ~/Applications/Jarvix.app to try it"
