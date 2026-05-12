@@ -5,7 +5,7 @@ import { UpdateBanner } from "@/components/layout/UpdateBanner";
 import "@/styles/globals.css";
 
 export const metadata: Metadata = {
-  title: "Jarvix OS",
+  title: "Jarvix",
   description: "Your personal AI command center",
   icons: {
     icon: "/icon.png",
