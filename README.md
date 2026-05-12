@@ -16,7 +16,7 @@ curl -fsSL https://raw.githubusercontent.com/squaked/Jarvix/main/install.sh | ba
 
 Press `⌘ Space`, type **Jarvix**, press Enter — or click the Jarvix icon in your Dock.
 
-<br/>
+
 <br/>
 <br/>
 
