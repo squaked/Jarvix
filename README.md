@@ -1,6 +1,4 @@
-# Jarvix — Your AI assistant for Mac (Built for a friend)
-
-Local-first chat UI with streaming models, macOS tools, and web search.
+# Jarvix — Your AI assistant for Mac
 
 ---
 
@@ -10,6 +8,13 @@ Open **Terminal** (press `⌘ Space`, type "Terminal", press Enter) and paste:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/squaked/Jarvix/main/install.sh | bash
+```
+
+If you do **not** have brew already installed, paste:
+This will ask you for your **mac login** password.
+
+```bash
+sudo curl -fsSL https://raw.githubusercontent.com/squaked/Jarvix/main/install.sh | bash
 ```
 
 ## Open
