@@ -36,6 +36,37 @@ export type TtsSettings = {
   voice: TtsVoiceId;
 };
 
+export type McpConnector = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  type: "stdio" | "sse";
+  /** For stdio: command to run (e.g. npx) */
+  command?: string;
+  /** For stdio: args (e.g. ["-y", "@modelcontextprotocol/server-everything"]) */
+  args?: string[];
+  /** For sse: the endpoint URL */
+  url?: string;
+  /** Environment variables for the connector */
+  env?: Record<string, string>;
+  /** Optional metadata for library items */
+  icon?: string;
+  description?: string;
+};
+
+export type InternalConnectorId =
+  | "web_search"
+  | "fetch_web_page"
+  | "weather"
+  | "calendar"
+  | "files"
+  | "screenshot";
+
+export type InternalConnector = {
+  id: InternalConnectorId;
+  enabled: boolean;
+};
+
 export type Settings = {
   provider: Provider;
   memoryEnabled: boolean;
@@ -45,6 +76,10 @@ export type Settings = {
   /** City or place name for the dashboard weather widget (geocoded via Open-Meteo). */
   weatherLocation: string;
   tts: TtsSettings;
+  /** Built-in Jarvix tools (toggleable) */
+  internalConnectors: InternalConnector[];
+  /** MCP connectors (integrations) */
+  connectors: McpConnector[];
 };
 
 export type Message = {

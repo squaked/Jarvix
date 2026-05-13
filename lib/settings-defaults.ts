@@ -29,4 +29,13 @@ export const DEFAULT_JARVIX_SETTINGS: Settings = {
     autoReadReplies: true,
     voice: "troy",
   },
+  internalConnectors: [
+    { id: "web_search", enabled: true },
+    { id: "fetch_web_page", enabled: true },
+    { id: "weather", enabled: true },
+    { id: "calendar", enabled: true },
+    { id: "files", enabled: true },
+    { id: "screenshot", enabled: true },
+  ],
+  connectors: [],
 };

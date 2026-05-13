@@ -7,15 +7,13 @@ import {
   getCalendarEventsRangeWithHint,
   getCalendarEventsTodayWithHint,
 } from "./tool-runners/eventkit";
-import {
-  spotlightByName,
-  spotlightContent,
-} from "./tool-runners/files";
+import { spotlightByName, spotlightContent } from "./tool-runners/files";
 import { captureScreenshotForAssistantTool } from "./tool-runners/screenshot";
 import { getWeather } from "./tool-runners/weather";
 import { addMemory, getMemory } from "./memory";
 import { parseCalendarRangeBounds } from "./calendar-parse";
 import { normalizeFact } from "./memory-policy";
+import type { InternalConnector } from "./types";
 
 /**
  * Gemini (via @ai-sdk/google) maps empty object schemas to `parameters: undefined`, which
@@ -43,10 +41,21 @@ const calendarRangeInputSchema = z.object({
     ),
 });
 
-export function createJarvixToolset(ctx: { memoryEnabled?: boolean }) {
+export function createJarvixToolset(ctx: {
+  memoryEnabled?: boolean;
+  internalConnectors?: InternalConnector[];
+}) {
   const memoryEnabled = Boolean(ctx.memoryEnabled);
-  return {
-    web_search: tool({
+  const connectors = ctx.internalConnectors || [];
+
+  const isEnabled = (id: string) => {
+    return connectors.find((c) => c.id === id)?.enabled ?? false;
+  };
+
+  const toolset: Record<string, any> = {};
+
+  if (isEnabled("web_search")) {
+    toolset.web_search = tool({
       description:
         "Search the web (no API key): tries DuckDuckGo instant answers first, then Bing web results (RSS) when instant has nothing — use for news, recent topics, and general lookups.",
       inputSchema: z.object({
@@ -65,9 +74,11 @@ export function createJarvixToolset(ctx: { memoryEnabled?: boolean }) {
           };
         }
       },
-    }),
+    });
+  }
 
-    fetch_web_page: tool({
+  if (isEnabled("fetch_web_page")) {
+    toolset.fetch_web_page = tool({
       description:
         "Fetch ONE public http(s) URL and return readable plain text (HTML tags stripped; no JavaScript execution). Use when the user pastes a link or needs the live contents of a specific page. Does not replace web_search for open-ended lookups. Private IPs, localhost, and non-standard ports are blocked.",
       inputSchema: z.object({
@@ -100,9 +111,11 @@ export function createJarvixToolset(ctx: { memoryEnabled?: boolean }) {
           };
         }
       },
-    }),
+    });
+  }
 
-    weather: tool({
+  if (isEnabled("weather")) {
+    toolset.weather = tool({
       description: "Get current weather for a city using Open-Meteo (no API key).",
       inputSchema: z.object({
         city: z.string().min(1).describe("City name, e.g. Paris"),
@@ -118,9 +131,11 @@ export function createJarvixToolset(ctx: { memoryEnabled?: boolean }) {
           return { error: e instanceof Error ? e.message : String(e) };
         }
       },
-    }),
+    });
+  }
 
-    calendar_events_today: tool({
+  if (isEnabled("calendar")) {
+    toolset.calendar_events_today = tool({
       description:
         "Read Apple Calendar events for today only (macOS EventKit). Prefer this tool when the user asks about “today”. If accessGranted is true, empty events means nothing scheduled today.",
       inputSchema: emptyToolInputSchema,
@@ -131,9 +146,9 @@ export function createJarvixToolset(ctx: { memoryEnabled?: boolean }) {
           return { error: e instanceof Error ? e.message : String(e) };
         }
       },
-    }),
+    });
 
-    calendar_events_range: tool({
+    toolset.calendar_events_range = tool({
       description:
         "Read Apple Calendar events between two instants (macOS EventKit). For “this week”, pass inclusive local dates as YYYY-MM-DD (start Monday, end Sunday). If accessGranted is true, empty events means nothing in range.",
       inputSchema: calendarRangeInputSchema,
@@ -151,9 +166,9 @@ export function createJarvixToolset(ctx: { memoryEnabled?: boolean }) {
           return { error: e instanceof Error ? e.message : String(e) };
         }
       },
-    }),
+    });
 
-    calendar_create_event: tool({
+    toolset.calendar_create_event = tool({
       description: "Create an event on the default Apple Calendar (macOS EventKit).",
       inputSchema: z.object({
         title: z.string().min(1, "Title required"),
@@ -168,9 +183,11 @@ export function createJarvixToolset(ctx: { memoryEnabled?: boolean }) {
           return { error: e instanceof Error ? e.message : String(e) };
         }
       },
-    }),
+    });
+  }
 
-    file_search: tool({
+  if (isEnabled("files")) {
+    toolset.file_search = tool({
       description:
         "Search local files on macOS using Spotlight (mdfind). Use name search by default.",
       inputSchema: z.object({
@@ -194,9 +211,11 @@ export function createJarvixToolset(ctx: { memoryEnabled?: boolean }) {
           return { error: e instanceof Error ? e.message : String(e) };
         }
       },
-    }),
+    });
+  }
 
-    screenshot: tool({
+  if (isEnabled("screenshot")) {
+    toolset.screenshot = tool({
       description:
         "Capture the main display to a PNG (macOS screencapture). Saves `.jarvix-data/last-screenshot.png` beside the project (or your configured data dir) — full image is not embedded in the tool response (token limits). Confirm success and describe or ask the user to open that file or paste a screenshot if pixel detail is required.",
       inputSchema: emptyToolInputSchema,
@@ -207,52 +226,52 @@ export function createJarvixToolset(ctx: { memoryEnabled?: boolean }) {
           return { error: e instanceof Error ? e.message : String(e) };
         }
       },
-    }),
+    });
+  }
 
-    ...(memoryEnabled
-      ? {
-          remember_user_note: tool({
-            description:
-              "Persist one short, durable fact about this user for future chats (preferences, recurring context, how they want help). Do not include their display name — phrase in neutral third person. Call only when they clearly shared something worth recalling later — not one-off tasks, secrets/passwords, or transient context. One fact per call; skip when unsure.",
-            inputSchema: z.object({
-              fact: z
-                .string()
-                .min(8)
-                .max(200)
-                .describe("Single concise fact in neutral third person about the user; omit display name"),
-            }),
-            execute: async ({ fact }) => {
-              try {
-                const normalized = normalizeFact(fact);
-                if (normalized.length < 6) {
-                  return { saved: false as const, reason: "too_short" };
-                }
-                const key = normalized.toLowerCase();
-                const existing = await getMemory();
-                const dup = existing.some(
-                  (m) => normalizeFact(m.fact).toLowerCase() === key,
-                );
-                if (dup) {
-                  return { saved: false as const, reason: "duplicate" };
-                }
-                const entry = await addMemory(normalized);
-                if (!entry) {
-                  return { saved: false as const, reason: "rejected" };
-                }
-                return { saved: true as const, id: entry.id };
-              } catch (e) {
-                return {
-                  saved: false as const,
-                  reason: "error" as const,
-                  detail:
-                    e instanceof Error ? e.message : "Could not save memory",
-                };
-              }
-            },
-          }),
+  if (memoryEnabled) {
+    toolset.remember_user_note = tool({
+      description:
+        "Persist one short, durable fact about this user for future chats (preferences, recurring context, how they want help). Do not include their display name — phrase in neutral third person. Call only when they clearly shared something worth recalling later — not one-off tasks, secrets/passwords, or transient context. One fact per call; skip when unsure.",
+      inputSchema: z.object({
+        fact: z
+          .string()
+          .min(8)
+          .max(200)
+          .describe("Single concise fact in neutral third person about the user; omit display name"),
+      }),
+      execute: async ({ fact }) => {
+        try {
+          const normalized = normalizeFact(fact);
+          if (normalized.length < 6) {
+            return { saved: false as const, reason: "too_short" };
+          }
+          const key = normalized.toLowerCase();
+          const existing = await getMemory();
+          const dup = existing.some(
+            (m) => normalizeFact(m.fact).toLowerCase() === key,
+          );
+          if (dup) {
+            return { saved: false as const, reason: "duplicate" };
+          }
+          const entry = await addMemory(normalized);
+          if (!entry) {
+            return { saved: false as const, reason: "rejected" };
+          }
+          return { saved: true as const, id: entry.id };
+        } catch (e) {
+          return {
+            saved: false as const,
+            reason: "error" as const,
+            detail:
+              e instanceof Error ? e.message : "Could not save memory",
+          };
         }
-      : {}),
-  };
+      },
+    });
+  }
+
+  return toolset;
 }
 
 export type JarvixToolSet = ReturnType<typeof createJarvixToolset>;

@@ -1,7 +1,6 @@
 "use client";
 
 import { AgentPersonalizationCard } from "@/components/settings/AgentPersonalizationCard";
-import { CalendarAccessCard } from "@/components/settings/CalendarAccessCard";
 import { WeatherLocationCard } from "@/components/settings/WeatherLocationCard";
 import { GroqUsageSection } from "@/components/settings/GroqUsageSection";
 import { MemoryViewer } from "@/components/settings/MemoryViewer";
@@ -9,6 +8,7 @@ import { ProviderForm } from "@/components/settings/ProviderForm";
 import { CheckUpdatesSection } from "@/components/settings/CheckUpdatesSection";
 import { ThemeCard } from "@/components/settings/ThemeCard";
 import { TtsSettingsCard } from "@/components/settings/TtsSettingsCard";
+import { ConnectorsCard } from "@/components/settings/ConnectorsCard";
 import { AboutCard } from "@/components/settings/AboutCard";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
@@ -57,7 +57,7 @@ export default function SettingsPage() {
         </Section>
 
         <Section title="Mac access">
-          <CalendarAccessCard />
+          <ConnectorsCard onSaved={notifySaved} />
         </Section>
 
         <Section title="App">

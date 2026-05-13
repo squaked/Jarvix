@@ -277,11 +277,7 @@ export default function ChatDetailPage({
       void refreshChats();
 
       const payloadTts = settingsPayload.tts;
-      if (
-        payloadTts.enabled &&
-        payloadTts.autoReadReplies &&
-        !aborted
-      ) {
+      if (payloadTts.enabled && !aborted) {
         const plain = markdownToPlainSpeech(fallbackBody);
         if (plain.length > 0) {
           void speak({

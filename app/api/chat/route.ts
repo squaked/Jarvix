@@ -15,6 +15,7 @@ import { groqUsageFromHeaders, isGroqUsagePayloadEmpty } from "@/lib/groq-usage-
 import { jarvixChatStreamProviderOptions } from "@/lib/chat-stream-provider-options";
 import { mergeSettingsPartial } from "@/lib/settings-merge";
 import { hasActiveApiKey } from "@/lib/settings-credentials";
+import { connectorManager } from "@/lib/connector-manager";
 import type { Message, Settings } from "@/lib/types";
 import { stepCountIs, streamText } from "ai";
 
@@ -53,6 +54,7 @@ export async function POST(req: NextRequest) {
   try {
     tools = createJarvixToolset({
       memoryEnabled: settings.memoryEnabled,
+      internalConnectors: settings.internalConnectors,
     });
   } catch (e) {
     return new Response(
@@ -63,6 +65,13 @@ export async function POST(req: NextRequest) {
       { status: 500, headers: { "Content-Type": "application/x-ndjson; charset=utf-8" } },
     );
   }
+
+  // Merge in tools from active Connectors (MCP)
+  const connectorTools = await connectorManager.getToolsForConnectors(settings.connectors || []);
+  const combinedTools = {
+    ...tools,
+    ...connectorTools,
+  };
 
   let model;
   try {
@@ -81,9 +90,32 @@ export async function POST(req: NextRequest) {
     ? formatMemoryForSystemPrompt(await getMemory())
     : "";
 
-  const webToolsHint = `
+  const ic = settings.internalConnectors || [];
+  const webSearchOn = Boolean(ic.find((c) => c.id === "web_search")?.enabled);
+  const fetchWebPageOn = Boolean(ic.find((c) => c.id === "fetch_web_page")?.enabled);
+  const webToolLines: string[] = [];
+  if (webSearchOn) {
+    webToolLines.push(
+      "web_search tries DuckDuckGo instant answers first, then falls back to Bing web results (RSS) when instant is empty — suitable for news and recent topics.",
+    );
+  }
+  if (fetchWebPageOn) {
+    webToolLines.push(
+      "fetch_web_page pulls readable text from one public http(s) URL (no JavaScript); use it when the user shares a link or needs that exact page.",
+    );
+  }
+  const webToolsHint =
+    webToolLines.length > 0
+      ? `
 
-web_search tries DuckDuckGo instant answers first, then falls back to Bing web results (RSS) when instant is empty — suitable for news and recent topics. fetch_web_page pulls readable text from one public http(s) URL (no JavaScript); use it when the user shares a link or needs that exact page. For paywalled or JS-heavy pages, suggest opening a browser.`;
+${webToolLines.join(" ")} For paywalled or JS-heavy pages, suggest opening a browser.`
+      : "";
+
+  const connectorToolsHint = settings.connectors?.length
+    ? `
+ 
+ Connectors: You have additional tools available from the user's connected services (Connectors). These tools are provided via the Model Context Protocol (MCP). Use them whenever they help fulfill the user's request (e.g. searching Gmail, Slack, etc.).`
+    : "";
 
   const memoryToolHint = settings.memoryEnabled
     ? `
@@ -138,7 +170,7 @@ ${personalizationBlock}
 
 ${userContextBlock}
 
-Be concise and accurate; admit uncertainty. Use tools when they clearly help answer the request. If a tool returns an error field, explain briefly and suggest fixes (e.g. API keys, permissions).${uxHint}${memoryExplain}${memoryToolHint}${memoryBlock}${webToolsHint}`;
+Be concise and accurate; admit uncertainty. Use tools when they clearly help answer the request. If a tool returns an error field, explain briefly and suggest fixes (e.g. API keys, permissions).${uxHint}${memoryExplain}${memoryToolHint}${memoryBlock}${webToolsHint}${connectorToolsHint}`;
 
   const coreMessages = jarvixMessagesToModel(messages);
 
@@ -157,7 +189,7 @@ Be concise and accurate; admit uncertainty. Use tools when they clearly help ans
           model,
           system: sys,
           messages: coreMessages,
-          tools,
+          tools: combinedTools,
           stopWhen: stepCountIs(24),
           providerOptions: po,
         });

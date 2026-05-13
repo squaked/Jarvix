@@ -14,6 +14,8 @@ type LegacyFlat = {
   agent?: unknown;
   weatherLocation?: unknown;
   tts?: unknown;
+  connectors?: unknown;
+  internalConnectors?: unknown;
 };
 
 function readProfileSlot(
@@ -70,6 +72,8 @@ export function mergeSettingsPartial(
       : DEFAULT_JARVIX_SETTINGS.weatherLocation;
 
   const tts = normalizeTtsSettings(p.tts);
+  const connectors = normalizeConnectors(p.connectors);
+  const internalConnectors = normalizeInternalConnectors(p.internalConnectors);
 
   return {
     provider: "groq",
@@ -78,6 +82,8 @@ export function mergeSettingsPartial(
     agent,
     weatherLocation,
     tts,
+    connectors,
+    internalConnectors,
   };
 }
 
@@ -131,4 +137,45 @@ function normalizeProfiles(p: LegacyFlat): Settings["profiles"] {
 
   base.groq = { ...base.groq, model: JARVIX_GROQ_CHAT_MODEL };
   return base;
+}
+
+export function normalizeConnectors(raw: unknown): Settings["connectors"] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((c) => {
+      if (!c || typeof c !== "object") return null;
+      const o = c as Record<string, unknown>;
+      return {
+        id: typeof o.id === "string" ? o.id : String(Math.random()),
+        name: typeof o.name === "string" ? o.name : "Unnamed Connector",
+        enabled: typeof o.enabled === "boolean" ? o.enabled : true,
+        type: o.type === "sse" ? ("sse" as const) : ("stdio" as const),
+        command: typeof o.command === "string" ? o.command : undefined,
+        args: Array.isArray(o.args)
+          ? o.args.filter((a) => typeof a === "string")
+          : undefined,
+        url: typeof o.url === "string" ? o.url : undefined,
+        env:
+          o.env && typeof o.env === "object"
+            ? (o.env as Record<string, string>)
+            : undefined,
+      };
+    })
+    .filter((c): c is NonNullable<typeof c> => c !== null);
+}
+
+export function normalizeInternalConnectors(
+  raw: unknown,
+): Settings["internalConnectors"] {
+  const base = DEFAULT_JARVIX_SETTINGS.internalConnectors;
+  if (!Array.isArray(raw)) return base;
+
+  return base.map((b) => {
+    const found = (raw as any[]).find((r) => r && r.id === b.id);
+    if (!found) return b;
+    return {
+      id: b.id,
+      enabled: typeof found.enabled === "boolean" ? found.enabled : b.enabled,
+    };
+  });
 }

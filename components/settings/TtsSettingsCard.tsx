@@ -2,13 +2,10 @@
 
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import {
-  ORPHEUS_ENGLISH_VOICES,
-} from "@/lib/tts-voices";
-import { ORPHEUS_ENGLISH_TERMS_PLAYGROUND_URL } from "@/lib/groq-user-error-message";
+import { Select } from "@/components/ui/Select";
+import { ORPHEUS_ENGLISH_VOICES } from "@/lib/tts-voices";
 import { useGroqTts } from "@/lib/use-groq-tts";
 import { useJarvixSettings } from "@/lib/settings";
-import { cn } from "@/lib/utils";
 import type { TtsVoiceId } from "@/lib/types";
 import { useState } from "react";
 
@@ -20,125 +17,110 @@ export function TtsSettingsCard({ onSaved }: Props) {
   const { settings, saveSettings } = useJarvixSettings();
   const tts = settings.tts;
   const { speak, stop } = useGroqTts();
-  const [previewBusy, setPreviewBusy] = useState<TtsVoiceId | null>(null);
+  const [previewBusy, setPreviewBusy] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
 
-  const patch = async (next: typeof tts) => {
-    await saveSettings({ tts: next });
+  const patch = async (next: Partial<typeof tts>) => {
+    // If enabling TTS, we always force autoReadReplies to true as per user request
+    if (next.enabled === true) {
+      next.autoReadReplies = true;
+    }
+    await saveSettings({ tts: { ...tts, ...next } });
     onSaved?.();
   };
 
-  const previewVoice = async (voiceId: TtsVoiceId) => {
+  const previewVoice = async () => {
     setPreviewError(null);
-    setPreviewBusy(voiceId);
+    setPreviewBusy(true);
     stop();
     try {
       await speak({
         messageId: "preview",
         plainText: "Hi! This is what I sound like. I'm ready to help you.",
-        voice: voiceId,
+        voice: tts.voice,
         settings,
       });
     } catch {
-      setPreviewError(
-        "Preview failed. Check your API key or connection.",
-      );
+      setPreviewError("Preview failed. Check your API key or connection.");
     } finally {
-      setPreviewBusy(null);
+      setPreviewBusy(false);
     }
   };
 
   return (
-    <Card className="space-y-5 p-6 sm:p-8">
-      <div>
-        <h2
-          className="font-display text-lg font-medium text-text"
-          style={{ fontVariationSettings: '"opsz" 20' }}
-        >
-          Read aloud
-        </h2>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <label className="flex cursor-pointer items-center gap-3">
-          <input
-            type="checkbox"
-            className="h-4 w-4 rounded border-border accent-[var(--accent)]"
-            checked={tts.enabled}
-            onChange={(e) =>
-              void patch({ ...tts, enabled: e.target.checked }).catch(() => {})
-            }
-          />
-          <span className="text-sm font-medium text-text">Read replies aloud</span>
-        </label>
-        <span className="text-xs text-muted">
-          Quick toggle is also in the header (home &amp; chat).
-        </span>
-      </div>
-
-      <label className="flex cursor-pointer items-center gap-3 opacity-100">
-        <input
-          type="checkbox"
-          className="h-4 w-4 rounded border-border accent-[var(--accent)]"
-          checked={tts.autoReadReplies}
-          disabled={!tts.enabled}
-          onChange={(e) =>
-            void patch({ ...tts, autoReadReplies: e.target.checked }).catch(
-              () => {},
-            )
-          }
-        />
-        <span className={cn("text-sm text-text", !tts.enabled && "text-muted")}>
-          Auto-play when a new reply finishes
-        </span>
-      </label>
-
-      <div className="space-y-2">
-        <p className="text-sm font-medium text-text">Voice</p>
-        {previewError ? (
-          <p
-            className="rounded-xl border border-red-500/30 bg-red-500/[0.07] px-3 py-2 text-sm text-red-600 dark:text-red-400"
-            role="alert"
+    <Card className="space-y-6 p-6 sm:p-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2
+            className="font-display text-lg font-medium text-text"
+            style={{ fontVariationSettings: '"opsz" 20' }}
           >
-            {previewError}
+            Read aloud
+          </h2>
+          <p className="mt-0.5 text-sm text-muted">
+            Jarvix will read his replies using Groq's high-quality voices.
           </p>
-        ) : null}
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {ORPHEUS_ENGLISH_VOICES.map((v) => {
-            const selected = tts.voice === v.id;
-            return (
-              <div
-                key={v.id}
-                className={cn(
-                  "flex items-center gap-2 rounded-2xl border px-3 py-2",
-                  selected
-                    ? "border-accent bg-accent/[0.07]"
-                    : "border-border bg-surface",
-                )}
-              >
-                <button
-                  type="button"
-                  className="min-w-0 flex-1 text-left text-sm font-medium text-text"
-                  onClick={() =>
-                    void patch({ ...tts, voice: v.id }).catch(() => {})
-                  }
-                >
-                  {v.label}
-                </button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="shrink-0 px-2 py-1 text-xs"
-                  disabled={previewBusy !== null}
-                  onClick={() => void previewVoice(v.id)}
-                >
-                  {previewBusy === v.id ? "…" : "Play"}
-                </Button>
-              </div>
-            );
-          })}
         </div>
+        <button
+          onClick={() => void patch({ enabled: !tts.enabled })}
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+            tts.enabled ? "bg-accent" : "bg-muted/30"
+          }`}
+        >
+          <span
+            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+              tts.enabled ? "translate-x-5" : "translate-x-0"
+            }`}
+          />
+        </button>
       </div>
+
+      {tts.enabled && (
+        <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="space-y-2">
+            <label className="text-xs font-semibold uppercase tracking-widest text-muted/80 px-1">
+              Voice Selection
+            </label>
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <Select
+                  value={tts.voice}
+                  onChange={(e) => void patch({ voice: e.target.value as TtsVoiceId })}
+                >
+                  {ORPHEUS_ENGLISH_VOICES.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={previewBusy}
+                onClick={() => void previewVoice()}
+                className="shrink-0 h-11 px-6"
+              >
+                {previewBusy ? "..." : "Play Preview"}
+              </Button>
+            </div>
+          </div>
+
+          {previewError && (
+            <p
+              className="rounded-xl border border-red-500/30 bg-red-500/[0.07] px-3 py-2 text-xs text-red-600 dark:text-red-400 animate-in slide-in-from-top-1"
+              role="alert"
+            >
+              {previewError}
+            </p>
+          )}
+
+          <p className="text-[10px] text-muted leading-relaxed px-1">
+            Note: Replies will be automatically read aloud when they finish generating. 
+            You can also toggle this quickly using the speaker icon in the header.
+          </p>
+        </div>
+      )}
     </Card>
   );
 }
