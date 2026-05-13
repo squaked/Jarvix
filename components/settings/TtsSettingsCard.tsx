@@ -58,7 +58,7 @@ export function TtsSettingsCard({ onSaved }: Props) {
             Read aloud
           </h2>
           <p className="mt-0.5 text-sm text-muted">
-            Jarvix will read his replies using Groq's high-quality voices.
+            {"Jarvix will read his replies using Groq's high-quality voices."}
           </p>
         </div>
         <button

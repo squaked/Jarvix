@@ -333,8 +333,9 @@ function GmailWizard({
           <div className="p-4 rounded-2xl bg-surface-2/50 border border-border/50">
             <h4 className="text-sm font-semibold text-text mb-2">1. Enable the API</h4>
             <p className="text-xs text-muted leading-relaxed">
-              First, you need to create a project in the Google Cloud Console and enable the Gmail API.
-              Don't worry, it's free and takes about 2 minutes.
+              {
+                "First, you need to create a project in the Google Cloud Console and enable the Gmail API. Don't worry, it's free and takes about 2 minutes."
+              }
             </p>
             <a
               href="https://console.cloud.google.com/flows/enableapi?apiid=gmail.googleapis.com"

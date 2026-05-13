@@ -1,4 +1,5 @@
 import { createMCPClient } from "@ai-sdk/mcp";
+import { Experimental_StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
 import type { McpConnector } from "./types";
 
 /**
@@ -80,28 +81,28 @@ class ConnectorManager {
       if (!connector.command) {
         throw new Error(`Connector "${connector.name}" is missing a command.`);
       }
+      const env: Record<string, string> = {};
+      for (const [k, v] of Object.entries(process.env)) {
+        if (v !== undefined) env[k] = v;
+      }
+      Object.assign(env, connector.env || {});
       return createMCPClient({
-        transport: {
-          type: "stdio",
+        transport: new Experimental_StdioMCPTransport({
           command: connector.command,
           args: connector.args || [],
-          env: {
-            ...process.env,
-            ...(connector.env || {}),
-          },
-        },
-      });
-    } else {
-      if (!connector.url) {
-        throw new Error(`Connector "${connector.name}" is missing a URL.`);
-      }
-      return createMCPClient({
-        transport: {
-          type: "http",
-          url: connector.url,
-        },
+          env,
+        }),
       });
     }
+    if (!connector.url) {
+      throw new Error(`Connector "${connector.name}" is missing a URL.`);
+    }
+    return createMCPClient({
+      transport: {
+        type: "sse",
+        url: connector.url,
+      },
+    });
   }
 }
 
